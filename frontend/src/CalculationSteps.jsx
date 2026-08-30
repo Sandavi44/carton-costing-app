@@ -1,0 +1,469 @@
+import React from 'react';
+
+export default function CalculationSteps({ formData, calculatedCost, theme }) {
+  if (!calculatedCost) {
+    return (
+      <div className={`rounded-2xl shadow-xl p-8 text-center ${
+        theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white text-gray-800'
+      }`}>
+        <h2 className="text-2xl font-bold mb-4">🧮 Calculation Logic & Steps</h2>
+        <div className="max-w-md mx-auto py-8">
+          <span className="text-5xl">💡</span>
+          <p className="text-gray-500 dark:text-slate-400 mt-4 font-medium">
+            Please perform a calculation in the <strong>Calculator</strong> tab first. 
+            Once calculated, this tab will show a live step-by-step solver substituting your inputs into all the equations.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const isDark = theme === 'dark';
+
+  // Helper variables for equations
+  const L = parseFloat(formData.cartonLength || 0);
+  const W = parseFloat(formData.cartonWidth || 0);
+  const H = parseFloat(formData.cartonHeight || 0);
+  const Qty = parseInt(formData.quantity || 1);
+  const ply = formData.plyType;
+  const boardType = formData.boardType;
+  const flute = formData.fluteType;
+  const wf = flute === 'B-Flute' ? 1.35 : 1.43;
+
+  // Retrieve calculated results
+  const sheetLength = calculatedCost.sheet_dimensions.sheet_length_mm;
+  const sheetWidth = calculatedCost.sheet_dimensions.sheet_width_mm;
+  const selectedReel = calculatedCost.reel_information?.selected_reel_mm ?? calculatedCost.sheet_dimensions.selected_reel_mm;
+  const sheetsPerReel = calculatedCost.reel_information?.sheets_per_reel ?? calculatedCost.sheet_dimensions.sheets_per_reel;
+  const wastePerReel = calculatedCost.reel_information?.waste_per_reel_mm ?? calculatedCost.sheet_dimensions.reel_waste_mm;
+  const boardArea = calculatedCost.sheet_dimensions.board_area_m2;
+  const totalGsm = calculatedCost.material.total_gsm;
+  const wastePercent = calculatedCost.material.waste_allowance_percent ?? (formData.taxType.includes('Inhouse') ? 5.0 : 3.0);
+  const weightPerSheet = calculatedCost.material.weight_per_sheet_kg;
+  const rate = calculatedCost.rates.rate_per_kg;
+  const rmCostBeforeSscl = calculatedCost.rates.rm_cost_before_sscl ?? (weightPerSheet * rate);
+  const ssclRate = calculatedCost.rates.sscl_rate ?? 2.125;
+  const ssclOnRm = calculatedCost.rates.sscl_on_rm ?? (rmCostBeforeSscl * (ssclRate / 100));
+  const inputTaxRate = calculatedCost.rates.input_tax_rate ?? 18.0;
+  const inputTaxOnRm = calculatedCost.rates.input_tax_on_rm ?? 0.0;
+  const vatRate = calculatedCost.rates.vat_rate ?? 18.0;
+  const rmCostWithSscl = calculatedCost.rates.rm_cost_with_sscl ?? (rmCostBeforeSscl + ssclOnRm);
+  const rmCost = calculatedCost.rates.rm_cost_per_carton;
+  const overheadTotal = parseFloat(formData.totalOverheadForOrder || 0);
+  const overheadPerCarton = calculatedCost.per_carton_costs.overhead;
+  const joiningCost = calculatedCost.per_carton_costs.joining;
+  const printCost = calculatedCost.per_carton_costs.print;
+  const slotting = parseFloat(formData.slottingCost || 0);
+  const bundling = parseFloat(formData.bundlingCost || 0);
+  const diecutting = parseFloat(formData.diecuttingCost || 0);
+  const additional = slotting + bundling + diecutting;
+  const subtotal = calculatedCost.per_carton_costs.subtotal;
+  const profitMargin = parseFloat(formData.profitMargin || 0);
+  const profitAmount = calculatedCost.profit.profit_amount;
+  const costWithProfit = calculatedCost.profit.cost_with_profit;
+
+  // Commissions
+  const hasInhouseCommission = calculatedCost.commissions?.has_inhouse_commission ?? formData.hasInhouseCommission;
+  const inhouseCommission = calculatedCost.commissions?.inhouse_commission ?? 0;
+  const costAfterInhouse = calculatedCost.commissions?.cost_after_inhouse ?? (costWithProfit + inhouseCommission);
+  const hasThirdPartyCommission = calculatedCost.commissions?.has_third_party_commission ?? formData.hasThirdPartyCommission;
+  const thirdPartyCommission = calculatedCost.commissions?.third_party_commission ?? 0;
+  const costAfterCommissions = calculatedCost.commissions?.cost_after_commissions ?? (costAfterInhouse + thirdPartyCommission);
+
+  // Transport
+  const hasTransport = calculatedCost.transport?.has_transport ?? formData.hasTransport;
+  const transportCost = calculatedCost.transport?.transport_cost ?? 0;
+  const transport = calculatedCost.transport?.transport_per_carton ?? 0;
+
+  const taxType = formData.taxType;
+  const taxAmount = calculatedCost.tax.tax_amount_per_carton;
+  const finalCost = calculatedCost.final.final_cost_per_carton;
+  const batchCost = calculatedCost.final.total_cost_batch;
+
+  // Modern Shell CSS Variables
+  const cardClass = `p-6 rounded-2xl border transition-all duration-200 ${
+    isDark ? 'bg-slate-800/40 border-slate-700 text-white' : 'bg-slate-50/40 border-gray-150 text-gray-800'
+  }`;
+
+  const solveBoxClass = `p-4 rounded-xl border text-sm mt-1.5 font-mono ${
+    isDark ? 'bg-slate-900/60 border-slate-700 text-slate-100' : 'bg-white border-gray-100 text-gray-600'
+  }`;
+
+  const phaseHeaderClass = `text-md font-bold uppercase tracking-wider mb-4 ${
+    isDark ? 'text-blue-400' : 'text-blue-900'
+  }`;
+
+  return (
+    <div className={`rounded-2xl shadow-xl p-8 max-w-4xl mx-auto transition-colors duration-200 text-left ${
+      isDark ? 'bg-slate-800 text-white border border-slate-700' : 'bg-white text-gray-800'
+    }`}>
+      <h2 className={`text-2xl font-bold mb-6 border-b pb-4 flex items-center gap-2 ${
+        isDark ? 'border-slate-700' : 'border-gray-100'
+      }`}>
+        <span>🧮</span> Live Costing Step-by-Step Solver
+      </h2>
+
+      <div className="space-y-8">
+        {/* PHASE 1 */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 1: Sheet Dimensions</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Sheet Length Calculation</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: {ply === '3-Ply' ? 'Length = (L + W) * 2 + 62' : 'Length = (L + W) * 2 + 75'}</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: ({L} + {W}) * 2 + {ply === '3-Ply' ? 62 : 75} = {sheetLength.toFixed(2)} mm
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">2. Sheet Width Calculation</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Width = (W + H) + X (X: 3-Ply = 26, 5-Ply = 32, 7-Ply = 36)</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: ({W} + {H}) + {ply === '3-Ply' ? 26 : ply === '5-Ply' ? 32 : 36} = {sheetWidth.toFixed(2)} mm
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 2 */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 2: Board Area</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Sheet Slicing Sourcing Area</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Area = Sheet Length * Selected Reel Width / Slices</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: ({sheetLength} * {selectedReel}) / {sheetsPerReel} = {(sheetLength * selectedReel / sheetsPerReel).toFixed(2)} mm²
+                </p>
+                <p className="text-blue-500 font-bold">
+                  Convert to m²: {(sheetLength * selectedReel / sheetsPerReel).toFixed(2)} / 1,000,000 = {boardArea.toFixed(4)} m²
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 3 */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 3: Material Weight</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Total GSM (with Wave Factor)</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">
+                  {ply === '3-Ply' && `Equation: Total GSM = Liner1 + (Flute * ${wf}) + Liner2`}
+                  {ply === '5-Ply' && `Equation: Total GSM = Liner1 + (Flute1 * ${wf}) + Liner2 + (Flute2 * ${wf}) + Liner3`}
+                  {ply === '7-Ply' && `Equation: Total GSM = Liner1 + (Flute1 * ${wf}) + Liner2 + (Flute2 * ${wf}) + Liner3 + (Flute3 * ${wf}) + Liner4`}
+                </p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: {totalGsm.toFixed(2)} gsm
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">2. Net Paper Weight per Sheet (kg)</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Net Weight = (Total GSM * Board Area) / 1000</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: ({totalGsm.toFixed(2)} * {boardArea.toFixed(4)}) / 1000 = {((totalGsm * boardArea) / 1000).toFixed(4)} kg
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">3. Gross Weight with Sourcing Waste Allowance ({wastePercent}%)</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Gross Weight = Net Weight * (1 + Waste %)</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: {((totalGsm * boardArea) / 1000).toFixed(4)} kg * (1 + {wastePercent}%) = {weightPerSheet.toFixed(4)} kg per sheet
+                </p>
+                <p className="text-xxs opacity-70 mt-1">
+                  (Waste allowance rule: Inhouse sourcing = 5.0%, Outsource sourcing = 3.0%)
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 4 */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 4: Raw Material Cost (Compounded Sourcing Taxes)</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Base Raw Material Cost</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Base RM Cost = Gross Weight * Rate per kg</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: {weightPerSheet.toFixed(4)} kg * Rs. {rate.toFixed(2)} = Rs. {rmCostBeforeSscl.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">2. Sourcing SSCL compounding ({ssclRate}%)</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: SSCL Amount = Base RM Cost * {ssclRate}%</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: Rs. {rmCostBeforeSscl.toFixed(2)} * {ssclRate}% = Rs. {ssclOnRm.toFixed(2)}
+                </p>
+                <p className="text-blue-500 font-bold">
+                  SSCL-Inclusive Cost = {rmCostBeforeSscl.toFixed(2)} + {ssclOnRm.toFixed(2)} = Rs. {rmCostWithSscl.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">3. Input VAT compounding ({inputTaxRate}%) - Non-VAT customers only</p>
+              <div className={solveBoxClass}>
+                {formData.taxType.includes('Non-VAT') ? (
+                  <>
+                    <p className="opacity-70">Equation: Input VAT = SSCL-Inclusive Cost * {inputTaxRate}%</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Solve: Rs. {rmCostWithSscl.toFixed(2)} * {inputTaxRate}% = Rs. {inputTaxOnRm.toFixed(2)}
+                    </p>
+                    <p className="text-blue-500 font-bold">
+                      Total RM Cost = {rmCostWithSscl.toFixed(2)} + {inputTaxOnRm.toFixed(2)} = Rs. {rmCost.toFixed(2)} per carton
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="opacity-70 font-semibold">VAT registered customer: Skip Input VAT compounding in raw materials cost (Rs. 0.00)</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Total RM Cost = Rs. {rmCost.toFixed(2)} per carton
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 5 */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 5: Overhead & Extra Surcharges</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm font-semibold">1. Per-Carton Cost Breakdown</p>
+              <div className={`p-4 rounded-xl border text-sm mt-1.5 space-y-2.5 font-mono ${
+                isDark ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-gray-100 text-gray-600'
+              }`}>
+                <div className="flex justify-between">
+                  <span>RM Cost:</span>
+                  <span className="font-bold">Rs. {rmCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-t border-dashed dark:border-slate-700">
+                  <span>Overhead Allocation (Total Rs. {Math.round(overheadTotal)} / Qty {Qty}):</span>
+                  <span className="font-bold">Rs. {overheadPerCarton.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-1 border-t border-dashed dark:border-slate-700">
+                  <span>Joining ({formData.joiningType}):</span>
+                  <span className="font-bold">Rs. {joiningCost.toFixed(2)}</span>
+                </div>
+                {formData.isPrinted && (
+                  <div className="flex justify-between py-1 border-t border-dashed dark:border-slate-700">
+                    <span>Printing Cost:</span>
+                    <span className="font-bold">Rs. {printCost.toFixed(2)}</span>
+                  </div>
+                )}
+                {additional > 0 && (
+                  <div className="flex justify-between py-1 border-t border-dashed dark:border-slate-700">
+                    <span>Additional (Slotting + Bundling + Die-cut):</span>
+                    <span className="font-bold">Rs. {additional.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-2 border-t-2 text-blue-500 font-bold dark:border-slate-700">
+                  <span>Subtotal Per Carton:</span>
+                  <span>Rs. {subtotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">2. Auto-Proposed Bundling Cost Formula</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70 font-xs">Equation: Bundling Cost = 2 * (2 * ((Width + Height) / 1000) + 508 / 1000)</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  {`Solve: 2 * (2 * ((${formData.cartonWidth || 0} + ${formData.cartonHeight || 0}) / 1000) + 508 / 1000) = Rs. ${(2 * (2 * (((parseFloat(formData.cartonWidth) || 0) + (parseFloat(formData.cartonHeight) || 0)) / 1000) + 508 / 1000)).toFixed(2)} per carton`}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 6 */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 6: Profit Margin</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Profit Application</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Profit = Subtotal * {profitMargin}% | Cost with Profit = Subtotal + Profit</p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Solve: Rs. {subtotal.toFixed(2)} * {profitMargin}% = Rs. {profitAmount.toFixed(2)} profit
+                </p>
+                <p className="text-blue-500 font-bold">
+                  Cost with Profit = {subtotal.toFixed(2)} + {profitAmount.toFixed(2)} = Rs. {costWithProfit.toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 6A: INHOUSE SALES COMMISSION */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 6A: Inhouse Sales Commission</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Inhouse Commission Check</p>
+              <div className={solveBoxClass}>
+                {hasInhouseCommission ? (
+                  <>
+                    <p className="opacity-70">Equation: Inhouse Commission = (Cost with Profit * 2) / 98</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Solve: (Rs. {costWithProfit.toFixed(2)} * 2) / 98 = Rs. {inhouseCommission.toFixed(2)} per carton
+                    </p>
+                    <p className="text-blue-500 font-bold">
+                      Cost after Inhouse Commission = {costWithProfit.toFixed(2)} + {inhouseCommission.toFixed(2)} = Rs. {costAfterInhouse.toFixed(2)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="opacity-70 font-semibold">Inhouse Sales Commission is deactivated (No).</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Cost after Inhouse Commission = Rs. {costWithProfit.toFixed(2)}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 6B: 3RD PARTY SALES COMMISSION */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 6B: 3rd Party Sales Commission</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. 3rd Party Commission Check</p>
+              <div className={solveBoxClass}>
+                {hasThirdPartyCommission ? (
+                  <>
+                    <p className="opacity-70">Equation: 3rd Party Commission = Manual Input Value</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      User Entered Value: Rs. {thirdPartyCommission.toFixed(2)} per carton
+                    </p>
+                    <p className="text-blue-500 font-bold">
+                      Cost after Commissions = {costAfterInhouse.toFixed(2)} + {thirdPartyCommission.toFixed(2)} = Rs. {costAfterCommissions.toFixed(2)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="opacity-70 font-semibold">3rd Party Sales Commission is deactivated (No).</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Cost after Commissions = Rs. {costAfterInhouse.toFixed(2)}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 7 */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 7: Transport (Delivery)</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Transport calculation</p>
+              <div className={solveBoxClass}>
+                {hasTransport ? (
+                  <>
+                    <p className="opacity-70">Equation: Transport Per Carton = Total Transport Cost / Quantity</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Solve: Rs. {transportCost.toFixed(2)} / {Qty} = Rs. {transport.toFixed(2)} per carton
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="opacity-70 font-semibold">No transport cost selected (No).</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Transport Cost = Rs. 0.00
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PHASE 8 */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 8: Tax Calculation</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Tax Option Details ({taxType})</p>
+              <div className={solveBoxClass}>
+                {taxType.includes('Non-VAT') ? (
+                  <>
+                    <p className="opacity-70 font-semibold">Formula: Non-VAT Customer</p>
+                    <p className="text-green-500 font-bold mt-1">
+                      Solve: Final Tax = Rs. 0.00
+                    </p>
+                    <p className="text-xs opacity-70 mt-1">
+                      (No final sales taxes are charged at the end. Instead, all input taxes (Input VAT {inputTaxRate}% + SSCL {ssclRate}%) were already fully capitalized into the raw material cost in Phase 4)
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    {taxType === 'VAT, Inhouse' ? (
+                      <>
+                        <p className="opacity-70">Formula: (VAT {vatRate}% + SSCL {ssclRate}%) on (Cost after Commissions + Overhead)</p>
+                        <p className="text-blue-500 font-bold mt-1">
+                          Solve: VAT (({costAfterCommissions.toFixed(2)} + {overheadPerCarton.toFixed(2)}) * {vatRate}%) = Rs. {( (costAfterCommissions + overheadPerCarton) * (vatRate / 100) ).toFixed(2)}
+                        </p>
+                        <p className="text-blue-500 font-bold">
+                          Solve: SSCL (({costAfterCommissions.toFixed(2)} + {overheadPerCarton.toFixed(2)}) * {ssclRate}%) = Rs. {( (costAfterCommissions + overheadPerCarton) * (ssclRate / 100) ).toFixed(2)}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="opacity-70">Formula: (VAT {vatRate}% + SSCL {ssclRate}%) on Cost after Commissions</p>
+                        <p className="text-blue-500 font-bold mt-1">
+                          Solve: VAT ({costAfterCommissions.toFixed(2)} * {vatRate}%) = Rs. {( costAfterCommissions * (vatRate / 100) ).toFixed(2)}
+                        </p>
+                        <p className="text-blue-500 font-bold">
+                          Solve: SSCL ({costAfterCommissions.toFixed(2)} * {ssclRate}%) = Rs. {( costAfterCommissions * (ssclRate / 100) ).toFixed(2)}
+                        </p>
+                      </>
+                    )}
+                    <p className="text-blue-500 font-bold mt-2 border-t pt-1.5 dark:border-slate-700">
+                      Total Tax: Rs. {taxAmount.toFixed(2)}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SUMMARY */}
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-2xl shadow-md">
+          <h3 className="text-md font-bold uppercase tracking-wide mb-3">Final Calculation Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm font-mono">
+            <div>
+              <p>Cost after Commissions: Rs. {costAfterCommissions.toFixed(2)}</p>
+              <p>Transport Cost: Rs. {transport.toFixed(2)}</p>
+              <p>Tax Amount: Rs. {taxAmount.toFixed(2)}</p>
+              <p className="text-lg font-bold mt-2">Final Carton Cost: Rs. {finalCost.toFixed(2)}</p>
+            </div>
+            <div className="border-t md:border-t-0 md:border-l border-white/20 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center">
+              <p>Quantity: {Qty} cartons</p>
+              <p className="text-xl font-extrabold mt-1">Total Batch Cost: Rs. {batchCost.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

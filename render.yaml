@@ -1,0 +1,43 @@
+# render.yaml - Render deployment blueprint
+# Push this to GitHub, then go to render.com New Blueprint
+
+services:
+  # SERVICE 1: Flask/Gunicorn Backend API
+  - type: web
+    name: carton-costing-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app_production:app --bind 0.0.0.0:10000 --workers 2 --timeout 120 --preload
+    plan: free
+    envVars:
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: carton-costing-db
+          property: connectionString
+      - key: FRONTEND_URL
+        value: https://carton-costing-app.onrender.com
+
+  # SERVICE 2: React/Vite Frontend (Static Site)
+  - type: web
+    name: carton-costing-app
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    plan: free
+    envVars:
+      - key: VITE_API_URL
+        value: https://carton-costing-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+# Free PostgreSQL database (90-day limit on free tier)
+databases:
+  - name: carton-costing-db
+    databaseName: carton_costing
+    plan: free
