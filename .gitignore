@@ -1,2 +1,14 @@
 ﻿# Docker volumes
 docker/volumes/
+node_modules/
+__pycache__/
+*.pyc
+*.db
+*.sqlite3
+venv/
+.venv/
+env/
+.env
+.DS_Store
+dist/
+build/
