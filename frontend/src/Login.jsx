@@ -44,39 +44,43 @@ export default function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-800">
-            🏭 Carton Costing
+    <div className="min-h-screen bg-[#0f141e] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#d4af37]/5 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#c5a880]/5 rounded-full blur-3xl"></div>
+
+      <div className="max-w-md w-full bg-[#131924]/90 backdrop-blur-xl border border-[#c5a880]/20 rounded-3xl shadow-2xl p-8 relative z-10">
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#d4af37] to-[#aa841e] flex justify-center items-center gap-3">
+            <span>📦</span> Carton Costing
           </h1>
-          <p className="text-gray-500 mt-2">
+          <p className="text-[#8c734b] mt-3 font-medium">
             {isRegister ? 'Create a new account' : 'Sign in to your account'}
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded text-sm text-red-700">
+          <div className="bg-red-950/40 border-l-4 border-red-500 p-4 mb-6 rounded text-sm text-red-300">
             ❌ {error}
           </div>
         )}
 
         {message && (
-          <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded text-sm text-green-700">
+          <div className="bg-emerald-950/40 border-l-4 border-emerald-500 p-4 mb-6 rounded text-sm text-emerald-300">
             ✅ {message}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">
               Username
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="w-full px-4 py-3 bg-[#0a0d14] border border-[#c5a880]/30 rounded-xl focus:ring-2 focus:ring-[#d4af37]/50 focus:border-[#d4af37] text-white outline-none transition placeholder-[#8c734b]/40"
               placeholder="Enter username"
               required
             />
@@ -84,28 +88,28 @@ export default function Login({ onLoginSuccess }) {
 
           {isRegister && (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">
                 Email Address
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                className="w-full px-4 py-3 bg-[#0a0d14] border border-[#c5a880]/30 rounded-xl focus:ring-2 focus:ring-[#d4af37]/50 focus:border-[#d4af37] text-white outline-none transition placeholder-[#8c734b]/40"
                 placeholder="Enter email"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">
               Password
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="w-full px-4 py-3 bg-[#0a0d14] border border-[#c5a880]/30 rounded-xl focus:ring-2 focus:ring-[#d4af37]/50 focus:border-[#d4af37] text-white outline-none transition placeholder-[#8c734b]/40"
               placeholder="Enter password"
               required
             />
@@ -114,13 +118,13 @@ export default function Login({ onLoginSuccess }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition disabled:opacity-50 mt-6"
+            className="w-full bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c] text-[#0f172a] font-bold py-3.5 rounded-xl transition disabled:opacity-50 mt-8 shadow-lg shadow-[#d4af37]/20"
           >
             {loading ? 'Processing...' : isRegister ? 'Register' : 'Login'}
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-8 text-center text-sm text-[#8c734b]">
           {isRegister ? (
             <p>
               Already have an account?{' '}
@@ -130,7 +134,7 @@ export default function Login({ onLoginSuccess }) {
                   setIsRegister(false);
                   setError('');
                 }}
-                className="text-blue-600 hover:underline font-semibold"
+                className="text-[#d4af37] hover:text-[#e5c158] hover:underline font-bold"
               >
                 Sign In
               </button>
@@ -144,7 +148,7 @@ export default function Login({ onLoginSuccess }) {
                   setIsRegister(true);
                   setError('');
                 }}
-                className="text-blue-600 hover:underline font-semibold"
+                className="text-[#d4af37] hover:text-[#e5c158] hover:underline font-bold"
               >
                 Register here
               </button>

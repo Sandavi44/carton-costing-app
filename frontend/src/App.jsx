@@ -122,7 +122,7 @@ function App() {
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <span className={`text-xl font-bold tracking-wide ${theme === 'dark' ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
-                  ⚜️ Carton Costing Luxury Panel
+                  📦 Carton Costing System
                 </span>
               </div>
               {/* Tabs */}

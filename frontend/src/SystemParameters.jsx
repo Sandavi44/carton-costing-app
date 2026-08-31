@@ -50,40 +50,46 @@ export default function SystemParameters({ theme }) {
   };
 
   return (
-    <div className={`rounded-2xl shadow-xl p-8 transition-colors duration-200 text-left ${
-      isDark ? 'bg-slate-800 text-white border border-slate-700' : 'bg-white text-gray-800'
+    <div className={`rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-left relative border ${
+      isDark ? 'bg-[#0f141e]/90 text-white border-[#c5a880]/20 shadow-black/50' : 'bg-[#fcfaf7] text-[#5c4c36] border-[#e8dfc7] shadow-xl'
     }`}>
-      <h2 className="text-2xl font-bold mb-6">⚙️ System Parameters (Admin Panel)</h2>
+      <h2 className={`text-2xl font-bold flex items-center gap-2 mb-6 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+        <span>⚙️</span> System Parameters (Admin Panel)
+      </h2>
 
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded text-red-700 text-sm">
+        <div className={`border-l-4 p-4 mb-6 rounded text-sm ${isDark ? 'bg-red-950/30 border-red-500 text-red-300' : 'bg-red-50 border-red-500 text-red-700'}`}>
           ❌ {error}
         </div>
       )}
 
       {successMsg && (
-        <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6 rounded text-green-700 text-sm">
+        <div className={`border-l-4 p-4 mb-6 rounded text-sm ${isDark ? 'bg-emerald-950/30 border-emerald-500 text-emerald-300' : 'bg-green-50 border-green-500 text-green-700'}`}>
           ✅ {successMsg}
         </div>
       )}
 
       {loading ? (
-        <div className="text-center py-10 text-gray-500">
+        <div className={`text-center py-10 ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
           <p className="animate-pulse">Loading parameters...</p>
         </div>
       ) : Object.keys(params).length === 0 ? (
-        <p className="text-gray-500">No system parameters defined in the database.</p>
+        <p className={`text-center py-10 border-2 border-dashed rounded-2xl ${
+          isDark ? 'border-[#c5a880]/20 text-slate-400' : 'border-[#dfd5bc] text-[#8c734b]/60'
+        }`}>
+          No system parameters defined in the database.
+        </p>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {Object.entries(params).map(([key, val]) => (
-            <div key={key} className={`flex justify-between items-center p-4 rounded-xl border transition ${
+            <div key={key} className={`flex justify-between items-center p-5 rounded-2xl border transition ${
               isDark 
-                ? 'bg-slate-900/40 border-slate-700 text-white hover:bg-slate-900/60' 
-                : 'bg-slate-50 border-gray-100 text-gray-800 hover:bg-slate-100/50'
+                ? 'bg-[#131924]/60 border-[#c5a880]/15 text-white hover:bg-[#1a2332]/80' 
+                : 'bg-white border-[#dfd5bc] text-[#5c4c36] hover:bg-[#faf8f5]'
             }`}>
               <div>
-                <p className="font-semibold capitalize">{key.replace(/_/g, ' ')}</p>
-                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{key}</p>
+                <p className={`font-semibold capitalize ${isDark ? 'text-slate-200' : 'text-[#5c4c36]'}`}>{key.replace(/_/g, ' ')}</p>
+                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#8c734b]/80'}`}>{key}</p>
               </div>
 
               <div className="flex items-center gap-4">
@@ -93,28 +99,32 @@ export default function SystemParameters({ theme }) {
                       type="text"
                       value={newValue}
                       onChange={(e) => setNewValue(e.target.value)}
-                      className={`px-3 py-1.5 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm w-24 ${
-                        isDark ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-gray-300 text-gray-800'
+                      className={`px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#c5a880]/40 text-sm w-24 ${
+                        isDark ? 'bg-[#0f141e] border-[#c5a880]/30 text-white' : 'bg-[#fcfbfa] border-[#dfd5bc] text-[#5c4c36]'
                       }`}
                       placeholder="New val"
                     />
                     <button
                       onClick={() => handleUpdate(key)}
-                      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-3 py-1.5 rounded text-xs transition cursor-pointer"
+                      className={`font-bold px-3.5 py-1.5 rounded-lg text-xs transition cursor-pointer border ${
+                        isDark ? 'bg-gradient-to-r from-[#d4af37] to-[#aa841e] text-[#0f172a] border-transparent hover:from-[#e5c158] hover:to-[#c2982c]' : 'bg-gradient-to-r from-[#8c734b] to-[#5c4c36] text-white border-transparent hover:from-[#9f8150] hover:to-[#7a6442]'
+                      }`}
                     >
                       Save
                     </button>
                     <button
                       onClick={() => setEditingParam(null)}
-                      className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-3 py-1.5 rounded text-xs transition cursor-pointer"
+                      className={`font-semibold px-3.5 py-1.5 rounded-lg text-xs transition cursor-pointer border ${
+                        isDark ? 'bg-[#1a2332] text-slate-300 border-[#c5a880]/20 hover:bg-slate-700' : 'bg-[#eae5d9] text-[#5c4c36] border-transparent hover:bg-[#dfd5bc]'
+                      }`}
                     >
                       Cancel
                     </button>
                   </div>
                 ) : (
                   <>
-                    <span className={`font-bold text-lg px-3 py-1 rounded shadow-xs border ${
-                      isDark ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-gray-200 text-gray-800'
+                    <span className={`font-bold text-lg px-4 py-1.5 rounded-xl shadow-xs border ${
+                      isDark ? 'bg-[#0f141e] border-[#c5a880]/30 text-[#d4af37]' : 'bg-[#fcfbfa] border-[#dfd5bc] text-[#8c734b]'
                     }`}>
                       {val}
                     </span>
@@ -123,7 +133,11 @@ export default function SystemParameters({ theme }) {
                         setEditingParam(key);
                         setNewValue(val);
                       }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 rounded text-xs transition shadow-xs cursor-pointer"
+                      className={`font-semibold px-4 py-2 rounded-xl text-xs transition shadow-sm cursor-pointer border ${
+                        isDark 
+                          ? 'bg-[#1a2332] border-[#c5a880]/30 text-[#d4af37] hover:bg-slate-700' 
+                          : 'bg-[#faf8f5] border-[#dfd5bc] text-[#8c734b] hover:bg-[#eae5d9]/60'
+                      }`}
                     >
                       Edit
                     </button>
