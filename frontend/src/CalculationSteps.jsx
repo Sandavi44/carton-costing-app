@@ -79,6 +79,9 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const taxAmount = calculatedCost.tax.tax_amount_per_carton;
   const finalCost = calculatedCost.final.final_cost_per_carton;
   const batchCost = calculatedCost.final.total_cost_batch;
+  const totalInvoiceValue = finalCost * Qty;
+  const totalRmCost = rmCost * Qty;
+  const totalNetProfit = profitAmount * Qty;
 
   // Modern Shell CSS Variables
   const cardClass = `p-6 rounded-2xl border transition-all duration-200 ${
@@ -447,19 +450,113 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
           </div>
         </div>
 
+        {/* PHASE 9: ORDER FINANCIAL METRICS */}
+        <div className={cardClass}>
+          <h3 className={phaseHeaderClass}>Phase 9: Key Financial Metrics</h3>
+
+          {/* 3 Metric Cards matching CostingApp */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className={`p-4 rounded-2xl border text-center transition ${
+              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+            }`}>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Invoice Value</p>
+              <p className="text-xl font-black">Rs. {totalInvoiceValue.toFixed(2)}</p>
+              <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
+                Rs. {finalCost.toFixed(2)} × {Qty}
+              </p>
+            </div>
+            
+            <div className={`p-4 rounded-2xl border text-center transition ${
+              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+            }`}>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Total RM Cost</p>
+              <p className="text-xl font-black">Rs. {totalRmCost.toFixed(2)}</p>
+              <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
+                Rs. {rmCost.toFixed(2)} × {Qty}
+              </p>
+            </div>
+            
+            <div className={`p-4 rounded-2xl border text-center transition ${
+              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+            }`}>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Net Profit</p>
+              <p className="text-xl font-black">Rs. {totalNetProfit.toFixed(2)}</p>
+              <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
+                Rs. {profitAmount.toFixed(2)} × {Qty}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">1. Invoice Value Calculation</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Invoice Value = Final Price per Carton × Quantity</p>
+                <p className={`${isDark ? 'text-[#d4af37]' : 'text-blue-600'} font-bold mt-1`}>
+                  Solve: Rs. {finalCost.toFixed(2)} × {Qty} = Rs. {totalInvoiceValue.toFixed(2)}
+                </p>
+                <p className="text-xs opacity-70 mt-1">
+                  (Total revenue billed to customer including production costs, margin, commissions, transport, and taxes)
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold">2. Total Raw Material (RM) Cost Calculation</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Total RM Cost = Phase 5 RM Cost per Carton × Quantity</p>
+                <p className={`${isDark ? 'text-[#d4af37]' : 'text-blue-600'} font-bold mt-1`}>
+                  Solve: Rs. {rmCost.toFixed(2)} × {Qty} = Rs. {totalRmCost.toFixed(2)}
+                </p>
+                <p className="text-xs opacity-70 mt-1">
+                  (Total paper, fluting, and material expenses invested for manufacturing the full batch of {Qty} cartons)
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold">3. Total Net Profit Calculation</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">Equation: Net Profit = Profit Margin per Carton (Phase 6) × Quantity</p>
+                <p className={`${isDark ? 'text-[#d4af37]' : 'text-blue-600'} font-bold mt-1`}>
+                  Solve: Rs. {profitAmount.toFixed(2)} × {Qty} = Rs. {totalNetProfit.toFixed(2)}
+                </p>
+                <p className="text-xs opacity-70 mt-1">
+                  (Net company profit realized after deducting direct material and production overhead costs)
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* SUMMARY */}
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-2xl shadow-md">
-          <h3 className="text-md font-bold uppercase tracking-wide mb-3">Final Calculation Summary</h3>
+        <div className={`p-6 rounded-2xl shadow-md border ${
+          isDark 
+            ? 'bg-gradient-to-r from-[#131924] to-[#1a2332] border-[#c5a880]/30 text-white' 
+            : 'bg-gradient-to-r from-[#faf8f5] to-[#f5efe6] border-[#dfd5bc] text-[#5c4c36]'
+        }`}>
+          <h3 className={`text-md font-bold uppercase tracking-wide mb-3 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+            Final Calculation Summary
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm font-mono">
             <div>
               <p>Cost after Commissions: Rs. {costAfterCommissions.toFixed(2)}</p>
               <p>Transport Cost: Rs. {transport.toFixed(2)}</p>
               <p>Tax Amount: Rs. {taxAmount.toFixed(2)}</p>
-              <p className="text-lg font-bold mt-2">Final Carton Cost: Rs. {finalCost.toFixed(2)}</p>
+              <p className={`text-lg font-bold mt-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+                Final Carton Cost: Rs. {finalCost.toFixed(2)}
+              </p>
             </div>
-            <div className="border-t md:border-t-0 md:border-l border-white/20 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center">
+            <div className={`border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-6 flex flex-col justify-center ${
+              isDark ? 'border-[#c5a880]/20' : 'border-[#dfd5bc]'
+            }`}>
               <p>Quantity: {Qty} cartons</p>
-              <p className="text-xl font-extrabold mt-1">Total Batch Cost: Rs. {batchCost.toFixed(2)}</p>
+              <p className="text-xl font-extrabold mt-1">
+                Invoice Value (Total Batch): Rs. {totalInvoiceValue.toFixed(2)}
+              </p>
+              <p className="text-xs opacity-75 mt-1">
+                Total RM Cost: Rs. {totalRmCost.toFixed(2)} | Net Profit: Rs. {totalNetProfit.toFixed(2)}
+              </p>
             </div>
           </div>
         </div>
