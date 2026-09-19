@@ -21,12 +21,18 @@ function CostDonutChart({ calculatedCost, theme }) {
 
   const additional = slotting + bundling + diecutting;
 
+  const additionalBreakdown = [
+    { label: 'Slotting', value: slotting },
+    { label: 'Bundling', value: bundling },
+    { label: 'Die-cutting', value: diecutting },
+  ].filter(item => item.value > 0);
+
   const rawSegments = [
     { label: 'Raw Material', value: rmCost, color: '#3b82f6' }, // blue-500
     { label: 'Overhead', value: overhead, color: '#10b981' }, // emerald-500
     { label: 'Joining', value: joining, color: '#8b5cf6' }, // violet-500
     { label: 'Printing', value: print, color: '#ec4899' }, // pink-500
-    { label: 'Additional', value: additional, color: '#f59e0b' }, // amber-500
+    { label: 'Additional', value: additional, color: '#f59e0b', breakdown: additionalBreakdown }, // amber-500
     { label: 'Transport', value: transport, color: '#f97316' }, // orange-500
     { label: 'Tax', value: tax, color: '#ef4444' }, // red-500
   ];
@@ -88,15 +94,19 @@ function CostDonutChart({ calculatedCost, theme }) {
         </div>
       </div>
       
-      {/* Legend with Numeric Values (2 decimal places) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 mt-4 text-[11px] w-full text-left">
+      {/* Legend with Numeric Values and Sub-Breakdown */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2 mt-4 w-full text-left">
         {segments.map((segment, idx) => {
           const percent = ((segment.value / total) * 100).toFixed(1);
           const isHovered = activeSegment?.label === segment.label;
+          const hasBreakdown = segment.breakdown && segment.breakdown.length > 0;
+
           return (
             <div 
               key={idx} 
-              className={`flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
+              className={`flex flex-col justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+                hasBreakdown ? 'col-span-1 sm:col-span-2' : ''
+              } ${
                 isHovered 
                   ? (isDark ? 'bg-slate-700/70 border-[#c5a880]/60 shadow-xs' : 'bg-white border-[#8c734b]/50 shadow-xs') 
                   : (isDark ? 'bg-[#131924]/50 border-slate-700/40 hover:bg-slate-800/70' : 'bg-white/70 border-gray-150 hover:bg-white')
@@ -106,17 +116,43 @@ function CostDonutChart({ calculatedCost, theme }) {
               }}
               onMouseLeave={() => setActiveSegment(null)}
             >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-xs" style={{ backgroundColor: segment.color }} />
-                <span className={`truncate font-medium ${isDark ? 'text-slate-200' : 'text-gray-700'}`}>
-                  {segment.label}
-                </span>
+              <div className="flex items-center justify-between gap-1.5 w-full">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-xs" style={{ backgroundColor: segment.color }} />
+                  <span className={`truncate font-medium text-[11px] ${isDark ? 'text-slate-200' : 'text-gray-700'}`}>
+                    {segment.label}
+                  </span>
+                </div>
+                <div className="text-right flex-shrink-0 font-mono text-[11px]">
+                  <span className={`font-bold ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+                    Rs. {segment.value.toFixed(2)}
+                  </span>
+                </div>
               </div>
-              <div className="text-right flex-shrink-0 font-mono">
-                <span className={`font-bold ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
-                  Rs. {segment.value.toFixed(2)}
-                </span>
-              </div>
+
+              {/* Sub-breakdown for Additional costs (Slotting, Bundling, Die-cutting) */}
+              {hasBreakdown && (
+                <div className="mt-2 pt-2 border-t border-dashed border-gray-200 dark:border-slate-700/60 grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[10px]">
+                  {segment.breakdown.map((sub, sIdx) => (
+                    <div 
+                      key={sIdx} 
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition-all ${
+                        isDark 
+                          ? 'bg-[#0f141e]/70 border-slate-700/60 text-slate-300' 
+                          : 'bg-slate-50 border-gray-200/70 text-gray-700'
+                      }`}
+                    >
+                      <span className="truncate flex items-center gap-1 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]/80 flex-shrink-0" />
+                        {sub.label}:
+                      </span>
+                      <span className={`font-mono font-bold ml-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+                        Rs. {sub.value.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -412,10 +448,29 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
     try {
       const gsmArray = buildGSMArray();
+      const isNonVat = (formData.taxType || calculatedCost?.tax?.tax_type || '').includes('Non-VAT');
+      const finalCost = isNonVat
+        ? ((calculatedCost.commissions?.cost_after_commissions ?? calculatedCost.profit?.cost_with_profit ?? 0) + (calculatedCost.transport?.transport_per_carton ?? 0))
+        : parseFloat(calculatedCost.final?.final_cost_per_carton || 0);
+      const batchCost = finalCost * (parseFloat(formData.quantity) || 1);
+
+      const payloadCalculatedCost = {
+        ...calculatedCost,
+        final: {
+          ...calculatedCost.final,
+          final_cost_per_carton: parseFloat(finalCost.toFixed(2)),
+          total_cost_batch: parseFloat(batchCost.toFixed(2))
+        },
+        tax: {
+          ...calculatedCost.tax,
+          tax_amount_per_carton: isNonVat ? 0.0 : calculatedCost.tax?.tax_amount_per_carton
+        }
+      };
+
       const response = await axios.post('/api/quotes/save', { 
         ...formData, 
         gsm_values: gsmArray, 
-        calculated_cost: calculatedCost 
+        calculated_cost: payloadCalculatedCost 
       }, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
@@ -451,6 +506,17 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   const headingClass = `text-lg font-bold mb-4 flex items-center gap-2 border-b pb-2 ${
     isDark ? 'text-[#d4af37] border-slate-700/60' : 'text-[#8c734b] border-[#e8dfc7]'
   }`;
+
+  // Ensure effective final cost per carton and invoice value consistently reflect Non-VAT (no added output tax)
+  const isNonVatCustomer = (formData.taxType || calculatedCost?.tax?.tax_type || '').includes('Non-VAT');
+  const finalCostPerCarton = calculatedCost
+    ? (isNonVatCustomer
+        ? ((calculatedCost.commissions?.cost_after_commissions ?? calculatedCost.profit?.cost_with_profit ?? 0) + (calculatedCost.transport?.transport_per_carton ?? 0))
+        : parseFloat(calculatedCost.final?.final_cost_per_carton || 0))
+    : 0;
+  const quantityNum = parseFloat(formData.quantity) || 1;
+  const totalInvoiceValue = finalCostPerCarton * quantityNum;
+  const totalBatchCost = totalInvoiceValue;
 
   return (
     <div className={`rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-left border ${
@@ -867,10 +933,10 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             }`}>
               <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Invoice Value</p>
               <p className="text-2xl font-black">
-                Rs. {(calculatedCost.final.final_cost_per_carton * (parseFloat(formData.quantity) || 1)).toFixed(2)}
+                Rs. {totalInvoiceValue.toFixed(2)}
               </p>
               <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
-                Rs. {calculatedCost.final.final_cost_per_carton} × {formData.quantity || 1}
+                Rs. {finalCostPerCarton.toFixed(2)} × {quantityNum}
               </p>
             </div>
             
@@ -879,10 +945,10 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             }`}>
               <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Total RM Cost</p>
               <p className="text-2xl font-black">
-                Rs. {(calculatedCost.rates.rm_cost_per_carton * (parseFloat(formData.quantity) || 1)).toFixed(2)}
+                Rs. {(calculatedCost.rates.rm_cost_per_carton * quantityNum).toFixed(2)}
               </p>
               <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
-                Rs. {calculatedCost.rates.rm_cost_per_carton} × {formData.quantity || 1}
+                Rs. {calculatedCost.rates.rm_cost_per_carton} × {quantityNum}
               </p>
             </div>
             
@@ -891,10 +957,10 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             }`}>
               <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Net Profit</p>
               <p className="text-2xl font-black">
-                Rs. {(calculatedCost.profit.profit_amount * (parseFloat(formData.quantity) || 1)).toFixed(2)}
+                Rs. {(calculatedCost.profit.profit_amount * quantityNum).toFixed(2)}
               </p>
               <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
-                Rs. {calculatedCost.profit.profit_amount} × {formData.quantity || 1}
+                Rs. {calculatedCost.profit.profit_amount} × {quantityNum}
               </p>
             </div>
           </div>
@@ -907,8 +973,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           }`}>
             <div>
               <p className="text-sm opacity-90">Final Cost Per Carton</p>
-              <p className={`text-4xl font-black ${isDark ? 'text-[#d4af37]' : 'text-white'}`}>Rs. {calculatedCost.final.final_cost_per_carton}</p>
-              <p className="text-sm mt-1 opacity-95">Total Batch: Rs. {calculatedCost.final.total_cost_batch}</p>
+              <p className={`text-4xl font-black ${isDark ? 'text-[#d4af37]' : 'text-white'}`}>Rs. {finalCostPerCarton.toFixed(2)}</p>
+              <p className="text-sm mt-1 opacity-95">Total Batch: Rs. {totalBatchCost.toFixed(2)}</p>
             </div>
 
             <button
