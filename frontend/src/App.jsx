@@ -26,6 +26,7 @@ function App() {
     plyType: '3-Ply',
     boardType: 'Whitecut',
     fluteType: 'B-Flute',
+    fluteType2: 'B-Flute',
     joiningType: 'Glued',
     isPrinted: false,
     whiteLinerRate: '',

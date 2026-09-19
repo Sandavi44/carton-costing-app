@@ -119,6 +119,7 @@ class Quote(db.Model):
     ply_type = db.Column(db.String(20), nullable=False)
     board_type = db.Column(db.String(20), nullable=False)
     flute_type = db.Column(db.String(20), nullable=False)  # CORRECTED: added flute type
+    flute_type_2 = db.Column(db.String(20), nullable=True)  # Flute type 2 for 5-Ply
     joining_type = db.Column(db.String(20), nullable=False)
     is_printed = db.Column(db.Boolean, default=False)
     
@@ -269,7 +270,8 @@ def calculate_cost():
             quantity=safe_int(data.get('quantity')),
             ply_type=data.get('ply_type'),
             board_type=data.get('board_type'),
-            flute_type=data.get('flute_type'),
+            flute_type=data.get('flute_type') or data.get('fluteType', 'B-Flute'),
+            flute_type_2=data.get('flute_type_2') or data.get('fluteType2') or data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             joining_type=data.get('joining_type'),
             is_printed=data.get('is_printed', False),
             white_liner_rate=safe_float(data.get('white_liner_rate', 0)),
@@ -339,7 +341,8 @@ def save_quote():
             quantity=quantity,
             ply_type=data.get('plyType'),
             board_type=data.get('boardType'),
-            flute_type=data.get('fluteType'),
+            flute_type=data.get('fluteType') or data.get('flute_type', 'B-Flute'),
+            flute_type_2=data.get('fluteType2') or data.get('flute_type_2') or data.get('fluteType') or data.get('flute_type', 'B-Flute'),
             joining_type=data.get('joiningType'),
             is_printed=data.get('isPrinted', False),
             gsm_values=json.dumps(gsm_values),
@@ -443,6 +446,7 @@ def get_quote(quote_id):
             'ply_type': quote.ply_type,
             'board_type': quote.board_type,
             'flute_type': quote.flute_type,
+            'flute_type_2': getattr(quote, 'flute_type_2', None) or quote.flute_type,
             'joining_type': quote.joining_type,
             'is_printed': quote.is_printed,
             'gsm_values': json.loads(quote.gsm_values) if quote.gsm_values else [],
@@ -553,6 +557,14 @@ def init_db():
     """Initialize database"""
     with app.app_context():
         db.create_all()
+        
+        # Ensure flute_type_2 column exists in quotes table
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(db.text("ALTER TABLE quotes ADD COLUMN flute_type_2 VARCHAR(20)"))
+                conn.commit()
+        except Exception:
+            pass  # Already exists or not supported
         
         # Create admin user
         if not User.query.filter_by(username='admin').first():

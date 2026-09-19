@@ -27,8 +27,15 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const Qty = parseInt(formData.quantity || 1);
   const ply = formData.plyType;
   const boardType = formData.boardType;
-  const flute = formData.fluteType;
-  const wf = flute === 'B-Flute' ? 1.35 : 1.43;
+  const flute1 = formData.fluteType || calculatedCost.material?.flute_type || 'B-Flute';
+  const flute2 = formData.fluteType2 || calculatedCost.material?.flute_type_2 || flute1;
+  const wf1 = flute1 === 'B-Flute' ? 1.35 : 1.43;
+  const wf2 = flute2 === 'B-Flute' ? 1.35 : 1.43;
+  const g1 = parseFloat(formData.gsm1) || 0;
+  const g2 = parseFloat(formData.gsm2) || 0;
+  const g3 = parseFloat(formData.gsm3) || 0;
+  const g4 = parseFloat(formData.gsm4) || 0;
+  const g5 = parseFloat(formData.gsm5) || 0;
 
   // Retrieve calculated results
   const sheetLength = calculatedCost.sheet_dimensions.sheet_length_mm;
@@ -162,12 +169,14 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
               <p className="text-sm font-semibold">1. Total GSM (with Wave Factor)</p>
               <div className={solveBoxClass}>
                 <p className="opacity-70">
-                  {ply === '3-Ply' && `Equation: Total GSM = Liner1 + (Flute * ${wf}) + Liner2`}
-                  {ply === '5-Ply' && `Equation: Total GSM = Liner1 + (Flute1 * ${wf}) + Liner2 + (Flute2 * ${wf}) + Liner3`}
-                  {ply === '7-Ply' && `Equation: Total GSM = Liner1 + (Flute1 * ${wf}) + Liner2 + (Flute2 * ${wf}) + Liner3 + (Flute3 * ${wf}) + Liner4`}
+                  {ply === '3-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Factor (${wf1}) + Liner 2 (Outer Liner)`}
+                  {ply === '5-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Type 1 Factor (${wf1}) + Liner 2 (Middle) + Flute 2 * Flute Type 2 Factor (${wf2}) + Liner 3 (Outer Liner)`}
+                  {ply === '7-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Type 1 Factor (${wf1}) + Liner 2 + Flute 2 * Flute Type 2 Factor (${wf2}) + Liner 3 + Flute 3 * Flute Type 1 Factor (${wf1}) + Liner 4`}
                 </p>
                 <p className="text-blue-500 font-bold mt-1">
-                  Solve: {totalGsm.toFixed(2)} gsm
+                  {ply === '3-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) + ${g3} = ${g1} + ${(g2 * wf1).toFixed(2)} + ${g3} = ${totalGsm.toFixed(2)} gsm`}
+                  {ply === '5-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) + ${g3} + (${g4} * ${wf2}) + ${g5} = ${g1} + ${(g2 * wf1).toFixed(2)} + ${g3} + ${(g4 * wf2).toFixed(2)} + ${g5} = ${totalGsm.toFixed(2)} gsm`}
+                  {ply === '7-Ply' && `Solve: Total GSM = ${totalGsm.toFixed(2)} gsm`}
                 </p>
               </div>
             </div>

@@ -77,6 +77,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         plyType: quote.ply_type || '3-Ply',
         boardType: quote.board_type || 'Whitecut',
         fluteType: quote.flute_type || 'B-Flute',
+        fluteType2: quote.flute_type_2 || quote.flute_type || 'B-Flute',
         joiningType: quote.joining_type || 'Glued',
         isPrinted: quote.is_printed || false,
         whiteLinerRate: quote.board_type === 'Whitecut' ? (quote.white_liner_rate || '') : '',
@@ -120,6 +121,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         ply_type: newFormData.plyType,
         board_type: newFormData.boardType,
         flute_type: newFormData.fluteType,
+        flute_type_2: newFormData.fluteType2 || newFormData.fluteType,
         joining_type: newFormData.joiningType,
         is_printed: newFormData.isPrinted,
         gsm_values: JSON.stringify(gsmValues),
@@ -472,6 +474,14 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
                 <span className="font-semibold">Board Type:</span>
                 <span>{selectedQuote.board_type}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
+                <span className="font-semibold">Flute Type:</span>
+                <span>
+                  {selectedQuote.ply_type === '5-Ply'
+                    ? `${selectedQuote.flute_type || 'B-Flute'} & ${selectedQuote.flute_type_2 || selectedQuote.flute_type || 'B-Flute'}`
+                    : (selectedQuote.flute_type || 'B-Flute')}
+                </span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
                 <span className="font-semibold">Quantity:</span>

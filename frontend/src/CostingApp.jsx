@@ -408,6 +408,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         ply_type: formData.plyType,
         board_type: formData.boardType,
         flute_type: formData.fluteType,
+        flute_type_2: formData.fluteType2 || formData.fluteType,
         joining_type: formData.joiningType,
         is_printed: formData.isPrinted,
         white_liner_rate: parseFloat(formData.whiteLinerRate || 0),
@@ -574,7 +575,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       <div className={`${cardClass} mb-6`}>
         <h3 className={headingClass}>📊 Material Type</h3>
         
-        <div className="grid grid-cols-3 gap-4">
+        <div className={`grid gap-4 ${formData.plyType === '5-Ply' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
           <div>
             <label className={labelClass}>Ply Type</label>
             <select name="plyType" value={formData.plyType} onChange={handleInputChange} className={selectClass}>
@@ -585,12 +586,22 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           </div>
           
           <div>
-            <label className={labelClass}>Flute Type</label>
+            <label className={labelClass}>{formData.plyType === '5-Ply' ? 'Flute Type 1' : 'Flute Type'}</label>
             <select name="fluteType" value={formData.fluteType} onChange={handleInputChange} className={selectClass}>
               <option value="B-Flute">B-Flute (1.35)</option>
               <option value="C-Flute">C-Flute (1.43)</option>
             </select>
           </div>
+
+          {formData.plyType === '5-Ply' && (
+            <div>
+              <label className={labelClass}>Flute Type 2</label>
+              <select name="fluteType2" value={formData.fluteType2 || 'B-Flute'} onChange={handleInputChange} className={selectClass}>
+                <option value="B-Flute">B-Flute (1.35)</option>
+                <option value="C-Flute">C-Flute (1.43)</option>
+              </select>
+            </div>
+          )}
 
           <div>
             <label className={labelClass}>Board Type</label>

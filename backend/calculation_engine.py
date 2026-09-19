@@ -127,6 +127,7 @@ class CostingParameters:
     slotting_cost: float = 0.0  # Rs./carton
     bundling_cost: float = 0.0  # Rs./carton
     diecutting_cost: float = 0.0  # Rs./carton
+    flute_type_2: str = "B-Flute"  # "B-Flute", "C-Flute" (for 5-Ply/7-Ply)
     
     # Profit and tax
     profit_margin_percent: float = 15.0
@@ -258,6 +259,7 @@ class CostingCalculator:
                 "ply_type": self.params.ply_type,
                 "board_type": self.params.board_type,
                 "flute_type": self.params.flute_type,
+                "flute_type_2": getattr(self.params, 'flute_type_2', self.params.flute_type),
                 "total_gsm": round(total_gsm, 2),
                 "weight_per_sheet_kg": round(final_weight_kg, 4),
                 "waste_allowance_percent": waste_allowance_percent,
@@ -357,21 +359,23 @@ class CostingCalculator:
         """Calculate total GSM with wave factors"""
         gsm = self.params.gsm_values
         
-        # Get wave factor
-        wave_factor = 1.35 if self.params.flute_type == "B-Flute" else 1.43
+        # Flute wave factors (B-Flute: 1.35, C-Flute: 1.43)
+        wave_factor_1 = 1.35 if self.params.flute_type == "B-Flute" else 1.43
+        flute_2 = getattr(self.params, 'flute_type_2', None) or self.params.flute_type
+        wave_factor_2 = 1.35 if flute_2 == "B-Flute" else 1.43
         
         if self.params.ply_type == "3-Ply":
-            # 3-Ply: Outer + (Flute × Factor) + Outer
-            return gsm[0] + (gsm[1] * wave_factor) + gsm[2]
+            # 3-Ply: Liner 1 + (Flute 1 × Factor) + Liner 2
+            return gsm[0] + (gsm[1] * wave_factor_1) + gsm[2]
         
         elif self.params.ply_type == "5-Ply":
-            # 5-Ply: O + (F×Factor) + M + (F×Factor) + O
-            return gsm[0] + (gsm[1] * wave_factor) + gsm[2] + (gsm[3] * wave_factor) + gsm[4]
+            # 5-Ply: Liner 1 + (Flute 1 × Factor 1) + Liner 2 (Middle) + (Flute 2 × Factor 2) + Liner 3 (Outer)
+            return gsm[0] + (gsm[1] * wave_factor_1) + gsm[2] + (gsm[3] * wave_factor_2) + gsm[4]
         
         else:  # 7-Ply
-            # 7-Ply: O + (F×Factor) + M + (F×Factor) + O + (F×Factor) + O
-            return (gsm[0] + (gsm[1] * wave_factor) + gsm[2] + 
-                   (gsm[3] * wave_factor) + gsm[4] + (gsm[5] * wave_factor) + gsm[6])
+            # 7-Ply: O + (F1×Factor1) + M + (F2×Factor2) + M + (F3×Factor1) + O
+            return (gsm[0] + (gsm[1] * wave_factor_1) + gsm[2] + 
+                   (gsm[3] * wave_factor_2) + gsm[4] + (gsm[5] * wave_factor_1) + gsm[6])
     
     def _calculate_base_weight(self, total_gsm: float, board_area_m2: float) -> float:
         """Calculate base weight per sheet"""
