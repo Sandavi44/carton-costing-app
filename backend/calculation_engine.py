@@ -396,18 +396,16 @@ class CostingCalculator:
         vat_rate_frac = self.params.vat_rate / 100
         sscl_rate_frac = self.params.sscl_rate / 100
         
-        if self.params.tax_type == "Non-VAT, Inhouse":
-            # SSCL on (cost + overhead)
-            taxable_base = cost_with_profit + overhead
-            sscl = taxable_base * sscl_rate_frac
-            breakdown = {"taxable_base": round(taxable_base, 2), f"sscl_{self.params.sscl_rate}%": round(sscl, 2)}
-            return sscl, breakdown
-        
-        elif self.params.tax_type == "Non-VAT, Outsource":
-            # SSCL on cost only
-            sscl = cost_with_profit * sscl_rate_frac
-            breakdown = {"taxable_base": round(cost_with_profit, 2), f"sscl_{self.params.sscl_rate}%": round(sscl, 2)}
-            return sscl, breakdown
+        if "Non-VAT" in self.params.tax_type:
+            # Non-VAT customers (both Inhouse and Outsource):
+            # No final tax is added on at the end stage.
+            # All input taxes (Input VAT + SSCL) were already capitalized into raw material cost in Phase 4/5.
+            breakdown = {
+                "taxable_base": 0.0,
+                "tax_amount": 0.0,
+                "note": "Non-VAT customer: No output tax added at final stage"
+            }
+            return 0.0, breakdown
         
         elif self.params.tax_type == "VAT, Inhouse":
             # VAT + SSCL on (cost + overhead)

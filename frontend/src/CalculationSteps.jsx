@@ -271,9 +271,31 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                   </div>
                 )}
                 {additional > 0 && (
-                  <div className="flex justify-between py-1 border-t border-dashed dark:border-slate-700">
-                    <span>Additional (Slotting + Bundling + Die-cut):</span>
-                    <span className="font-bold">Rs. {additional.toFixed(2)}</span>
+                  <div className="py-1 border-t border-dashed dark:border-slate-700">
+                    <div className="flex justify-between">
+                      <span>Additional Costs:</span>
+                      <span className="font-bold">Rs. {additional.toFixed(2)}</span>
+                    </div>
+                    <div className="pl-4 pt-1 space-y-0.5 text-xs opacity-80">
+                      {slotting > 0 && (
+                        <div className="flex justify-between">
+                          <span>• Slotting:</span>
+                          <span className="font-mono font-medium">Rs. {slotting.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {bundling > 0 && (
+                        <div className="flex justify-between">
+                          <span>• Bundling:</span>
+                          <span className="font-mono font-medium">Rs. {bundling.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {diecutting > 0 && (
+                        <div className="flex justify-between">
+                          <span>• Die-cutting:</span>
+                          <span className="font-mono font-medium">Rs. {diecutting.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
                 <div className="flex justify-between pt-2 border-t-2 text-blue-500 font-bold dark:border-slate-700">
@@ -542,7 +564,11 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
             <div>
               <p>Cost after Commissions: Rs. {costAfterCommissions.toFixed(2)}</p>
               <p>Transport Cost: Rs. {transport.toFixed(2)}</p>
-              <p>Tax Amount: Rs. {taxAmount.toFixed(2)}</p>
+              {taxType.includes('Non-VAT') ? (
+                <p className="opacity-75">Tax Amount: None (Non-VAT)</p>
+              ) : (
+                <p>Tax Amount: Rs. {taxAmount.toFixed(2)}</p>
+              )}
               <p className={`text-lg font-bold mt-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
                 Final Carton Cost: Rs. {finalCost.toFixed(2)}
               </p>
