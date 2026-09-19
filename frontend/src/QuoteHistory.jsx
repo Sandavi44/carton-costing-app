@@ -397,10 +397,14 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   setSelectedQuote(actionPromptQuote);
                   setActionPromptQuote(null);
                 }}
+                style={{
+                  backgroundColor: isDark ? '#d4af37' : '#8c734b',
+                  color: isDark ? '#0f172a' : '#ffffff'
+                }}
                 className={`w-full font-bold py-3 rounded-2xl shadow-md transition block text-sm text-center cursor-pointer hover:scale-[1.01] ${
                   isDark 
-                    ? 'bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c] text-[#0f172a]' 
-                    : 'bg-gradient-to-r from-[#8c734b] to-[#5c4c36] hover:from-[#9f8150] hover:to-[#7a6442] text-white'
+                    ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
+                    : 'bg-[#8c734b] text-white bg-gradient-to-r from-[#8c734b] to-[#5c4c36] hover:from-[#9f8150] hover:to-[#7a6442]'
                 }`}
               >
                 🔍 View Costing Summary Modal
@@ -517,11 +521,17 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                 </div>
               </div>
 
-              <div className={`mt-6 rounded-2xl p-5 shadow-xs border ${
-                isDark 
-                  ? 'bg-gradient-to-r from-[#1a2332] to-[#131924] border-[#c5a880]/30 text-[#e2d4c0]' 
-                  : 'bg-gradient-to-r from-[#8c734b] to-[#5c4c36] text-white border-[#dfd5bc]'
-              }`}>
+              <div
+                style={{
+                  backgroundColor: isDark ? '#1a2332' : '#8c734b',
+                  color: isDark ? '#e2d4c0' : '#ffffff'
+                }}
+                className={`mt-6 rounded-2xl p-5 shadow-xs border ${
+                  isDark 
+                    ? 'bg-[#1a2332] text-[#e2d4c0] bg-gradient-to-r from-[#1a2332] to-[#131924] border-[#c5a880]/30' 
+                    : 'bg-[#8c734b] text-white bg-gradient-to-r from-[#8c734b] to-[#5c4c36] border-[#dfd5bc]'
+                }`}
+              >
                 <div className="flex justify-between mb-2">
                   <span className="opacity-95">Cost per Carton:</span>
                   <span className="text-xl font-bold">Rs. {selectedQuote.final_cost_per_carton}</span>

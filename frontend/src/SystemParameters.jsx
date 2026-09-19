@@ -106,8 +106,12 @@ export default function SystemParameters({ theme }) {
                     />
                     <button
                       onClick={() => handleUpdate(key)}
+                      style={{
+                        backgroundColor: isDark ? '#d4af37' : '#8c734b',
+                        color: isDark ? '#0f172a' : '#ffffff'
+                      }}
                       className={`font-bold px-3.5 py-1.5 rounded-lg text-xs transition cursor-pointer border ${
-                        isDark ? 'bg-gradient-to-r from-[#d4af37] to-[#aa841e] text-[#0f172a] border-transparent hover:from-[#e5c158] hover:to-[#c2982c]' : 'bg-gradient-to-r from-[#8c734b] to-[#5c4c36] text-white border-transparent hover:from-[#9f8150] hover:to-[#7a6442]'
+                        isDark ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] border-transparent hover:from-[#e5c158] hover:to-[#c2982c]' : 'bg-[#8c734b] text-white bg-gradient-to-r from-[#8c734b] to-[#5c4c36] border-transparent hover:from-[#9f8150] hover:to-[#7a6442]'
                       }`}
                     >
                       Save

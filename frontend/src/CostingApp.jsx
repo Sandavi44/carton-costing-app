@@ -856,13 +856,22 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       </div>
 
       <button
+        type="button"
         onClick={calculateCost}
         disabled={loading}
-        className={`w-full bg-gradient-to-r ${
+        style={{
+          backgroundColor: isDark ? '#d4af37' : '#8c734b',
+          color: isDark ? '#0f172a' : '#ffffff',
+          display: 'block',
+          width: '100%',
+          visibility: 'visible',
+          opacity: loading ? 0.6 : 1
+        }}
+        className={`w-full ${isDark ? 'bg-[#d4af37] text-[#0f172a]' : 'bg-[#8c734b] text-white'} bg-gradient-to-r ${
           isDark 
-            ? 'from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c] text-[#0f172a]' 
-            : 'from-[#8c734b] to-[#5c4c36] hover:from-[#9f8150] hover:to-[#7a6442] text-white'
-        } font-bold py-4 rounded-2xl transition duration-150 cursor-pointer shadow-lg disabled:opacity-50 text-sm hover:scale-[1.005] active:scale-[0.995] uppercase tracking-wider`}
+            ? 'from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
+            : 'from-[#8c734b] to-[#5c4c36] hover:from-[#9f8150] hover:to-[#7a6442]'
+        } font-bold py-4 rounded-2xl transition duration-150 cursor-pointer shadow-lg text-sm uppercase tracking-wider mt-4`}
       >
         {loading ? '🔄 Calculating...' : '✨ Calculate Cost'}
       </button>
@@ -978,10 +987,17 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             </div>
 
             <button
+              type="button"
               onClick={saveQuote}
+              style={{
+                backgroundColor: isDark ? '#d4af37' : '#ffffff',
+                color: isDark ? '#0f172a' : '#5c4c36',
+                visibility: 'visible',
+                display: 'inline-block'
+              }}
               className={`font-black py-3 px-8 rounded-2xl shadow-lg transition duration-150 cursor-pointer hover:scale-[1.03] active:scale-[0.97] ${
                 isDark 
-                  ? 'bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c] text-[#0f172a]' 
+                  ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
                   : 'bg-white hover:bg-[#faf8f5] text-[#5c4c36]'
               }`}
             >

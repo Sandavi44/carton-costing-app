@@ -118,7 +118,8 @@ export default function Login({ onLoginSuccess }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c] text-[#0f172a] font-bold py-3.5 rounded-xl transition disabled:opacity-50 mt-8 shadow-lg shadow-[#d4af37]/20"
+            style={{ backgroundColor: '#d4af37', color: '#0f172a' }}
+            className="w-full bg-[#d4af37] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c] text-[#0f172a] font-bold py-3.5 rounded-xl transition disabled:opacity-50 mt-8 shadow-lg shadow-[#d4af37]/20"
           >
             {loading ? 'Processing...' : isRegister ? 'Register' : 'Login'}
           </button>
