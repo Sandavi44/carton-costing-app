@@ -75,10 +75,13 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const transportCost = calculatedCost.transport?.transport_cost ?? 0;
   const transport = calculatedCost.transport?.transport_per_carton ?? 0;
 
-  const taxType = formData.taxType;
-  const taxAmount = calculatedCost.tax.tax_amount_per_carton;
-  const finalCost = calculatedCost.final.final_cost_per_carton;
-  const batchCost = calculatedCost.final.total_cost_batch;
+  const taxType = formData.taxType || calculatedCost.tax?.tax_type || '';
+  const isNonVat = taxType.includes('Non-VAT');
+  const taxAmount = isNonVat ? 0 : (calculatedCost.tax?.tax_amount_per_carton || 0);
+  const finalCost = isNonVat 
+    ? (costAfterCommissions + transport) 
+    : (calculatedCost.final?.final_cost_per_carton ?? (costAfterCommissions + transport + taxAmount));
+  const batchCost = finalCost * Qty;
   const totalInvoiceValue = finalCost * Qty;
   const totalRmCost = rmCost * Qty;
   const totalNetProfit = profitAmount * Qty;
