@@ -38,10 +38,10 @@ function CostDonutChart({ calculatedCost, theme }) {
   let accumulatedPercent = 0;
 
   return (
-    <div className={`flex flex-col items-center p-6 rounded-2xl border shadow-xs w-full transition-colors duration-200 ${
-      isDark ? 'bg-slate-800/50 border-slate-700 text-slate-100' : 'bg-slate-50/50 border-gray-100 text-gray-800'
+    <div className={`flex flex-col items-center p-6 rounded-3xl border shadow-xs w-full transition-colors duration-200 ${
+      isDark ? 'bg-[#1a2332]/60 border-slate-700/60 text-[#e2d4c0]' : 'bg-[#fcfbfa]/80 border-[#e8dfc7] text-[#5c4c36]'
     }`}>
-      <h3 className={`text-sm font-bold mb-4 ${isDark ? 'text-blue-400' : 'text-blue-900'}`}>🍩 Cost Breakdown (Per Carton)</h3>
+      <h3 className={`text-sm font-bold mb-4 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>🍩 Cost Breakdown (Per Carton)</h3>
       <div className="relative w-44 h-44 flex-shrink-0">
         <svg viewBox="0 0 140 140" className="w-full h-full transform -rotate-90">
           <circle cx="70" cy="70" r="50" fill="transparent" stroke={isDark ? "#334155" : "#f3f4f6"} strokeWidth="15" />
@@ -76,7 +76,7 @@ function CostDonutChart({ calculatedCost, theme }) {
             <>
               <span className={`text-[10px] font-medium truncate max-w-[100px] ${isDark ? 'text-slate-400' : 'text-gray-400'}`}>{activeSegment.label}</span>
               <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>Rs. {activeSegment.value.toFixed(2)}</span>
-              <span className="text-xs text-blue-500 font-semibold">{activeSegment.percent}%</span>
+              <span className={`text-xs font-semibold ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>{activeSegment.percent}%</span>
             </>
           ) : (
             <>
@@ -88,22 +88,38 @@ function CostDonutChart({ calculatedCost, theme }) {
         </div>
       </div>
       
-      {/* Legend */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-4 text-[11px] w-full text-left">
-        {segments.map((segment, idx) => (
-          <div 
-            key={idx} 
-            className="flex items-center gap-1.5 cursor-pointer truncate"
-            onMouseEnter={() => {
-              const percent = segment.value / total;
-              setActiveSegment({ ...segment, percent: (percent * 100).toFixed(1) });
-            }}
-            onMouseLeave={() => setActiveSegment(null)}
-          >
-            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: segment.color }} />
-            <span className={`truncate font-medium transition-colors ${isDark ? 'text-slate-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>{segment.label}</span>
-          </div>
-        ))}
+      {/* Legend with Numeric Values (2 decimal places) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 mt-4 text-[11px] w-full text-left">
+        {segments.map((segment, idx) => {
+          const percent = ((segment.value / total) * 100).toFixed(1);
+          const isHovered = activeSegment?.label === segment.label;
+          return (
+            <div 
+              key={idx} 
+              className={`flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                isHovered 
+                  ? (isDark ? 'bg-slate-700/70 border-[#c5a880]/60 shadow-xs' : 'bg-white border-[#8c734b]/50 shadow-xs') 
+                  : (isDark ? 'bg-[#131924]/50 border-slate-700/40 hover:bg-slate-800/70' : 'bg-white/70 border-gray-150 hover:bg-white')
+              }`}
+              onMouseEnter={() => {
+                setActiveSegment({ ...segment, percent });
+              }}
+              onMouseLeave={() => setActiveSegment(null)}
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-xs" style={{ backgroundColor: segment.color }} />
+                <span className={`truncate font-medium ${isDark ? 'text-slate-200' : 'text-gray-700'}`}>
+                  {segment.label}
+                </span>
+              </div>
+              <div className="text-right flex-shrink-0 font-mono">
+                <span className={`font-bold ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+                  Rs. {segment.value.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
