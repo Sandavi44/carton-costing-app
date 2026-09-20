@@ -1,4 +1,4 @@
-﻿# render-demo.yaml
+# render-demo.yaml
 # DEMO / STAGING blueprint — completely separate from the production render.yaml.
 # Deploy this via: Render Dashboard > New Blueprint > point to this file.
 # This spins up: carton-costing-demo-api + carton-costing-demo-app + a throwaway DB.
@@ -32,7 +32,6 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    plan: free
     envVars:
       - key: VITE_API_URL
         value: https://carton-costing-demo-api.onrender.com
