@@ -478,9 +478,9 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
               isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
             }`}>
               <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Invoice Value</p>
-              <p className="text-xl font-black">Rs. {totalInvoiceValue.toFixed(2)}</p>
+              <p className="text-xl font-black">Rs. {totalInvoiceValue.toFixed(2)}{!isNonVat ? ' + VAT' : ''}</p>
               <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
-                Rs. {finalCost.toFixed(2)} × {Qty}
+                Rs. {finalCost.toFixed(2)}{!isNonVat ? ' + VAT' : ''} × {Qty}
               </p>
             </div>
             
@@ -511,7 +511,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
               <div className={solveBoxClass}>
                 <p className="opacity-70">Equation: Invoice Value = Final Price per Carton × Quantity</p>
                 <p className={`${isDark ? 'text-[#d4af37]' : 'text-blue-600'} font-bold mt-1`}>
-                  Solve: Rs. {finalCost.toFixed(2)} × {Qty} = Rs. {totalInvoiceValue.toFixed(2)}
+                  Solve: Rs. {finalCost.toFixed(2)}{!isNonVat ? ' + VAT' : ''} × {Qty} = Rs. {totalInvoiceValue.toFixed(2)}{!isNonVat ? ' + VAT' : ''}
                 </p>
                 <p className="text-xs opacity-70 mt-1">
                   (Total revenue billed to customer including production costs, margin, commissions, transport, and taxes)
@@ -563,10 +563,10 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
               {taxType.includes('Non-VAT') ? (
                 <p className="opacity-75">Tax Amount: None (Non-VAT)</p>
               ) : (
-                <p>Tax Amount: Rs. {taxAmount.toFixed(2)}</p>
+                <p>Tax Amount: Rs. {taxAmount.toFixed(2)} (SSCL 2.125%)</p>
               )}
               <p className={`text-lg font-bold mt-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
-                Final Carton Cost: Rs. {finalCost.toFixed(2)}
+                Final Carton Cost: Rs. {finalCost.toFixed(2)}{!isNonVat ? ' + VAT' : ''}
               </p>
             </div>
             <div className={`border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-6 flex flex-col justify-center ${
@@ -574,7 +574,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
             }`}>
               <p>Quantity: {Qty} cartons</p>
               <p className="text-xl font-extrabold mt-1">
-                Invoice Value (Total Batch): Rs. {totalInvoiceValue.toFixed(2)}
+                Invoice Value (Total Batch): Rs. {totalInvoiceValue.toFixed(2)}{!isNonVat ? ' + VAT' : ''}
               </p>
               <p className="text-xs opacity-75 mt-1">
                 Total RM Cost: Rs. {totalRmCost.toFixed(2)} | Net Profit: Rs. {totalNetProfit.toFixed(2)}

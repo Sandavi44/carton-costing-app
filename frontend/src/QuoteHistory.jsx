@@ -352,7 +352,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                     {quote.ply_type} / <span className={`font-semibold ${isDark ? 'text-white' : 'text-[#5c4c36]'}`}>{quote.quantity}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap font-semibold">
-                    Rs. {quote.final_cost_per_carton} / <span className={isDark ? "text-[#d4af37]" : "text-[#8c734b]"}>Rs. {quote.total_cost_batch}</span>
+                    Rs. {quote.final_cost_per_carton}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''} / <span className={isDark ? "text-[#d4af37]" : "text-[#8c734b]"}>Rs. {quote.total_cost_batch}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
                   </td>
                   <td className={`px-6 py-4 whitespace-nowrap text-xs ${isDark ? 'text-slate-400' : 'text-[#8c734b]/80'}`}>
                     {new Date(quote.created_at).toLocaleDateString()}{' '}
@@ -524,7 +524,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               }`}>
                 <div className={`flex justify-between font-semibold ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
                   <span>Invoice Value (Qty * Price):</span>
-                  <span>Rs. {(selectedQuote.final_cost_per_carton * selectedQuote.quantity).toFixed(2)}</span>
+                  <span>Rs. {(selectedQuote.final_cost_per_carton * selectedQuote.quantity).toFixed(2)}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
                 </div>
                 <div className={`flex justify-between font-semibold ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
                   <span>Total RM Cost (RM Cost * Qty):</span>
@@ -549,11 +549,11 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               >
                 <div className="flex justify-between mb-2">
                   <span className="opacity-95">Cost per Carton:</span>
-                  <span className="text-xl font-bold">Rs. {selectedQuote.final_cost_per_carton}</span>
+                  <span className="text-xl font-bold">Rs. {selectedQuote.final_cost_per_carton}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="opacity-95">Total Batch Cost:</span>
-                  <span className="text-xl font-bold">Rs. {selectedQuote.total_cost_batch}</span>
+                  <span className="text-xl font-bold">Rs. {selectedQuote.total_cost_batch}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
                 </div>
               </div>
             </div>
