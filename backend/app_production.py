@@ -232,6 +232,30 @@ def login():
         return jsonify({'error': str(e)}), 400
 
 
+@app.route('/api/auth/demo-login', methods=['POST'])
+def demo_login():
+    """One-click guest login for portfolio demo — only active when DEMO_MODE=true."""
+    if os.getenv('DEMO_MODE', '').lower() != 'true':
+        return jsonify({'error': 'Demo mode is not enabled on this server'}), 403
+
+    try:
+        demo_user = User.query.filter_by(username='demo').first()
+        if not demo_user:
+            return jsonify({'error': 'Demo account not initialised. Contact the developer.'}), 500
+
+        access_token = create_access_token(identity=str(demo_user.id))
+        return jsonify({
+            'access_token': access_token,
+            'user': {
+                'id': demo_user.id,
+                'username': demo_user.username,
+                'is_admin': False
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
 # ============================================================================
 # API ENDPOINTS - CALCULATION
 # ============================================================================
@@ -549,9 +573,155 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 
-# ============================================================================
-# DATABASE INITIALIZATION
-# ============================================================================
+def seed_demo_data():
+    """Seed the database with fake demo data. Only runs when DEMO_MODE=true."""
+    from datetime import date
+
+    # Create demo user
+    if not User.query.filter_by(username='demo').first():
+        demo = User(username='demo', email='demo@example.com', is_admin=False)
+        demo.set_password('demo-not-used')  # password not used — demo-login bypasses it
+        db.session.add(demo)
+        db.session.flush()
+
+    demo_user = User.query.filter_by(username='demo').first()
+
+    # Only seed quotes if none exist for the demo user
+    if Quote.query.filter_by(user_id=demo_user.id).count() > 0:
+        db.session.commit()
+        return
+
+    # Fake customers
+    fake_customers = [
+        Customer(name='Packaging Co. (Demo)', email='info@packagingco-demo.lk', phone='011-2345678', location='Colombo'),
+        Customer(name='FreshBox Exports (Demo)', email='orders@freshbox-demo.lk', phone='011-9876543', location='Gampaha'),
+        Customer(name='Ceylon Corrugated (Demo)', email='sales@ceylon-demo.lk', phone='038-2234567', location='Kalutara'),
+    ]
+    for c in fake_customers:
+        db.session.add(c)
+    db.session.flush()
+
+    # Realistic fake quotes
+    demo_quotes_data = [
+        dict(
+            customer_name='Packaging Co. (Demo)',
+            carton_length_mm=400, carton_width_mm=300, carton_height_mm=250,
+            quantity=5000, ply_type='3-Ply', board_type='Whitecut', flute_type='B-Flute',
+            joining_type='Glued', is_printed=True,
+            sheet_length_mm=1050, sheet_width_mm=640, board_area_m2=0.672,
+            selected_reel_mm=650, sheets_per_reel=8, reel_waste_mm=10,
+            total_gsm=420, weight_per_sheet_kg=0.282,
+            white_liner_rate=185.0, brown_liner_rate=165.0,
+            rm_cost_per_carton=52.40, overhead_per_carton=4.80,
+            total_overhead_for_order=24000, joining_cost=3.50, print_cost=8.00,
+            slotting_cost=1.20, bundling_cost=0.80, diecutting_cost=0,
+            subtotal_per_carton=70.70, profit_margin_percent=15.0,
+            profit_per_carton=10.61, cost_with_profit_per_carton=81.31,
+            delivery_required=True, delivery_location='Colombo', distance_km=25,
+            transport_per_carton=0.50, has_inhouse_commission=True,
+            has_third_party_commission=False, third_party_commission=0,
+            has_transport=True, transport_cost=2500,
+            tax_type='VAT', tax_amount_per_carton=14.74,
+            final_cost_per_carton=96.55, total_cost_batch=482750.00,
+            quote_date=date(2026, 7, 12),
+        ),
+        dict(
+            customer_name='FreshBox Exports (Demo)',
+            carton_length_mm=500, carton_width_mm=350, carton_height_mm=300,
+            quantity=2000, ply_type='5-Ply', board_type='Kraftcut', flute_type='BC-Flute',
+            joining_type='Stitched', is_printed=False,
+            sheet_length_mm=1300, sheet_width_mm=800, board_area_m2=1.040,
+            selected_reel_mm=810, sheets_per_reel=6, reel_waste_mm=10,
+            total_gsm=680, weight_per_sheet_kg=0.707,
+            white_liner_rate=185.0, brown_liner_rate=165.0,
+            rm_cost_per_carton=116.60, overhead_per_carton=6.00,
+            total_overhead_for_order=12000, joining_cost=5.50, print_cost=0,
+            slotting_cost=1.20, bundling_cost=0.80, diecutting_cost=0,
+            subtotal_per_carton=130.10, profit_margin_percent=15.0,
+            profit_per_carton=19.52, cost_with_profit_per_carton=149.62,
+            delivery_required=False, delivery_location='', distance_km=0,
+            transport_per_carton=0, has_inhouse_commission=False,
+            has_third_party_commission=True, third_party_commission=7.48,
+            has_transport=False, transport_cost=0,
+            tax_type='Non-VAT, Inhouse', tax_amount_per_carton=27.05,
+            final_cost_per_carton=184.15, total_cost_batch=368300.00,
+            quote_date=date(2026, 7, 28),
+        ),
+        dict(
+            customer_name='Ceylon Corrugated (Demo)',
+            carton_length_mm=250, carton_width_mm=200, carton_height_mm=150,
+            quantity=10000, ply_type='3-Ply', board_type='Kraftcut', flute_type='E-Flute',
+            joining_type='Glued', is_printed=True,
+            sheet_length_mm=700, sheet_width_mm=440, board_area_m2=0.308,
+            selected_reel_mm=450, sheets_per_reel=12, reel_waste_mm=10,
+            total_gsm=380, weight_per_sheet_kg=0.117,
+            white_liner_rate=185.0, brown_liner_rate=165.0,
+            rm_cost_per_carton=19.30, overhead_per_carton=3.20,
+            total_overhead_for_order=32000, joining_cost=2.80, print_cost=6.00,
+            slotting_cost=0.90, bundling_cost=0.60, diecutting_cost=0,
+            subtotal_per_carton=32.80, profit_margin_percent=15.0,
+            profit_per_carton=4.92, cost_with_profit_per_carton=37.72,
+            delivery_required=True, delivery_location='Kalutara', distance_km=45,
+            transport_per_carton=0.40, has_inhouse_commission=False,
+            has_third_party_commission=False, third_party_commission=0,
+            has_transport=True, transport_cost=4000,
+            tax_type='VAT', tax_amount_per_carton=6.86,
+            final_cost_per_carton=44.98, total_cost_batch=449800.00,
+            quote_date=date(2026, 8, 5),
+        ),
+        dict(
+            customer_name='Packaging Co. (Demo)',
+            carton_length_mm=600, carton_width_mm=400, carton_height_mm=350,
+            quantity=3000, ply_type='5-Ply', board_type='Whitecut', flute_type='B-Flute',
+            joining_type='Glued', is_printed=True,
+            sheet_length_mm=1550, sheet_width_mm=950, board_area_m2=1.473,
+            selected_reel_mm=960, sheets_per_reel=5, reel_waste_mm=10,
+            total_gsm=560, weight_per_sheet_kg=0.825,
+            white_liner_rate=185.0, brown_liner_rate=165.0,
+            rm_cost_per_carton=152.60, overhead_per_carton=7.20,
+            total_overhead_for_order=21600, joining_cost=6.00, print_cost=10.00,
+            slotting_cost=1.50, bundling_cost=1.00, diecutting_cost=0,
+            subtotal_per_carton=178.30, profit_margin_percent=15.0,
+            profit_per_carton=26.75, cost_with_profit_per_carton=205.05,
+            delivery_required=False, delivery_location='', distance_km=0,
+            transport_per_carton=0, has_inhouse_commission=True,
+            has_third_party_commission=False, third_party_commission=0,
+            has_transport=False, transport_cost=0,
+            tax_type='VAT', tax_amount_per_carton=36.91,
+            final_cost_per_carton=241.96, total_cost_batch=725880.00,
+            quote_date=date(2026, 8, 19),
+        ),
+        dict(
+            customer_name='FreshBox Exports (Demo)',
+            carton_length_mm=320, carton_width_mm=220, carton_height_mm=180,
+            quantity=7500, ply_type='3-Ply', board_type='Whitecut', flute_type='C-Flute',
+            joining_type='Glued', is_printed=False,
+            sheet_length_mm=840, sheet_width_mm=520, board_area_m2=0.437,
+            selected_reel_mm=530, sheets_per_reel=10, reel_waste_mm=10,
+            total_gsm=390, weight_per_sheet_kg=0.170,
+            white_liner_rate=185.0, brown_liner_rate=165.0,
+            rm_cost_per_carton=28.10, overhead_per_carton=3.80,
+            total_overhead_for_order=28500, joining_cost=3.00, print_cost=0,
+            slotting_cost=0.90, bundling_cost=0.60, diecutting_cost=0,
+            subtotal_per_carton=36.40, profit_margin_percent=15.0,
+            profit_per_carton=5.46, cost_with_profit_per_carton=41.86,
+            delivery_required=True, delivery_location='Gampaha', distance_km=30,
+            transport_per_carton=0.30, has_inhouse_commission=False,
+            has_third_party_commission=False, third_party_commission=0,
+            has_transport=True, transport_cost=2250,
+            tax_type='Non-VAT, Inhouse', tax_amount_per_carton=7.59,
+            final_cost_per_carton=49.75, total_cost_batch=373125.00,
+            quote_date=date(2026, 9, 2),
+        ),
+    ]
+
+    for q_data in demo_quotes_data:
+        q = Quote(user_id=demo_user.id, **q_data)
+        db.session.add(q)
+
+    db.session.commit()
+    print(f"[DEMO] Seeded {len(demo_quotes_data)} fake quotes for demo user.")
+
 
 def init_db():
     """Initialize database"""
@@ -589,7 +759,12 @@ def init_db():
         
         db.session.commit()
 
+        # Seed fake demo data when running in demo mode
+        if os.getenv('DEMO_MODE', '').lower() == 'true':
+            seed_demo_data()
+
 
 if __name__ == '__main__':
     init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
+

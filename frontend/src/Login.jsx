@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+
 export default function Login({ onLoginSuccess }) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
@@ -9,6 +11,7 @@ export default function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,12 +27,10 @@ export default function Login({ onLoginSuccess }) {
 
     try {
       if (isRegister) {
-        // Register flow
         const response = await axios.post('/api/auth/register', { username, password, email });
         setMessage(response.data.message + '! You can now log in.');
         setIsRegister(false);
       } else {
-        // Login flow
         const response = await axios.post('/api/auth/login', { username, password });
         const { access_token, user } = response.data;
         localStorage.setItem('access_token', access_token);
@@ -43,9 +44,24 @@ export default function Login({ onLoginSuccess }) {
     }
   };
 
+  const handleDemoLogin = async () => {
+    setError('');
+    setDemoLoading(true);
+    try {
+      const response = await axios.post('/api/auth/demo-login');
+      const { access_token, user } = response.data;
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+      onLoginSuccess(access_token, user);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Demo login failed. Please try again.');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0f141e] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative background elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#d4af37]/5 rounded-full blur-3xl"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#c5a880]/5 rounded-full blur-3xl"></div>
 
@@ -58,6 +74,27 @@ export default function Login({ onLoginSuccess }) {
             {isRegister ? 'Create a new account' : 'Sign in to your account'}
           </p>
         </div>
+
+        {IS_DEMO && (
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              disabled={demoLoading}
+              className="w-full border-2 border-[#d4af37] text-[#d4af37] hover:bg-[#d4af37]/10 font-bold py-3.5 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {demoLoading ? 'Loading demo...' : <><span>⚡</span> Try Demo — No Login Required</>}
+            </button>
+            <p className="text-center text-xs text-[#8c734b]/70 mt-2">
+              Staging instance · fake data only · safe to explore
+            </p>
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-px bg-[#c5a880]/20"></div>
+              <span className="text-xs text-[#8c734b]/60 uppercase tracking-wider">or sign in</span>
+              <div className="flex-1 h-px bg-[#c5a880]/20"></div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-950/40 border-l-4 border-red-500 p-4 mb-6 rounded text-sm text-red-300">
@@ -73,9 +110,7 @@ export default function Login({ onLoginSuccess }) {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">
-              Username
-            </label>
+            <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">Username</label>
             <input
               type="text"
               value={username}
@@ -88,9 +123,7 @@ export default function Login({ onLoginSuccess }) {
 
           {isRegister && (
             <div>
-              <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">
-                Email Address
-              </label>
+              <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">Email Address</label>
               <input
                 type="email"
                 value={email}
@@ -102,9 +135,7 @@ export default function Login({ onLoginSuccess }) {
           )}
 
           <div>
-            <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">
-              Password
-            </label>
+            <label className="block text-sm font-semibold text-[#c5a880] mb-1.5">Password</label>
             <input
               type="password"
               value={password}
@@ -131,10 +162,7 @@ export default function Login({ onLoginSuccess }) {
               Already have an account?{' '}
               <button
                 type="button"
-                onClick={() => {
-                  setIsRegister(false);
-                  setError('');
-                }}
+                onClick={() => { setIsRegister(false); setError(''); }}
                 className="text-[#d4af37] hover:text-[#e5c158] hover:underline font-bold"
               >
                 Sign In
@@ -142,13 +170,10 @@ export default function Login({ onLoginSuccess }) {
             </p>
           ) : (
             <p>
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button
                 type="button"
-                onClick={() => {
-                  setIsRegister(true);
-                  setError('');
-                }}
+                onClick={() => { setIsRegister(true); setError(''); }}
                 className="text-[#d4af37] hover:text-[#e5c158] hover:underline font-bold"
               >
                 Register here
