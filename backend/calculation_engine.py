@@ -128,10 +128,11 @@ class CostingParameters:
     bundling_cost: float = 0.0  # Rs./carton
     diecutting_cost: float = 0.0  # Rs./carton
     flute_type_2: str = "B-Flute"  # "B-Flute", "C-Flute" (for 5-Ply/7-Ply)
+    production_method: str = "In-house"  # "In-house", "Outsource"
     
     # Profit and tax
     profit_margin_percent: float = 15.0
-    tax_type: str = "Non-VAT, Inhouse"
+    tax_type: str = "Non-VAT"
     sscl_rate: float = 2.125
     vat_rate: float = 18.0
     input_tax_rate: float = 18.0
@@ -175,18 +176,19 @@ class CostingCalculator:
         else:
             board_area_m2 = 0.0
         
-        # Determine waste allowance percent based on tax type (Inhouse = 5%, Outsource = 3%)
-        if "Inhouse" in self.params.tax_type:
-            waste_allowance_percent = 5.0
-        else:
+        # Determine waste allowance percent based on production method (In-house = 5%, Outsource = 3%)
+        prod_method = getattr(self.params, 'production_method', 'In-house')
+        if prod_method == "Outsource" or "Outsource" in getattr(self.params, 'tax_type', ''):
             waste_allowance_percent = 3.0
+        else:
+            waste_allowance_percent = 5.0
             
         # Weight calculations
         total_gsm = self._calculate_total_gsm()
         base_weight_kg = self._calculate_base_weight(total_gsm, board_area_m2)
         final_weight_kg = base_weight_kg * (1 + waste_allowance_percent / 100)
         
-        # CORRECTED: Rate selection based on board type only
+        # Rate selection based on board type only
         rate = self._get_rate()
         rm_cost_before_sscl = final_weight_kg * rate
         sscl_on_rm = rm_cost_before_sscl * (self.params.sscl_rate / 100)
@@ -197,14 +199,21 @@ class CostingCalculator:
         
         rm_cost_per_carton = rm_cost_with_sscl + input_tax_on_rm
         
-        # Overhead per carton = total overhead ÷ quantity
-        overhead_per_carton = self.params.total_overhead_for_order / self.params.quantity if self.params.quantity > 0 else 0
-        
-        joining_cost = self.params.joining_cost
-        print_cost = self.params.print_cost if self.params.is_printed else 0
-        slotting_cost = self.params.slotting_cost
-        bundling_cost = self.params.bundling_cost
-        diecutting_cost = self.params.diecutting_cost
+        # Process costs: For outsource option, all costs disappear (overhead, joining, printing, slotting, bundling, diecutting = 0)
+        if prod_method == "Outsource":
+            overhead_per_carton = 0.0
+            joining_cost = 0.0
+            print_cost = 0.0
+            slotting_cost = 0.0
+            bundling_cost = 0.0
+            diecutting_cost = 0.0
+        else:
+            overhead_per_carton = self.params.total_overhead_for_order / self.params.quantity if self.params.quantity > 0 else 0
+            joining_cost = self.params.joining_cost
+            print_cost = self.params.print_cost if self.params.is_printed else 0
+            slotting_cost = self.params.slotting_cost
+            bundling_cost = self.params.bundling_cost
+            diecutting_cost = self.params.diecutting_cost
         
         # Subtotal per carton
         subtotal_per_carton = (rm_cost_per_carton + overhead_per_carton + 
@@ -260,6 +269,7 @@ class CostingCalculator:
                 "board_type": self.params.board_type,
                 "flute_type": self.params.flute_type,
                 "flute_type_2": getattr(self.params, 'flute_type_2', self.params.flute_type),
+                "production_method": getattr(self.params, 'production_method', 'In-house'),
                 "total_gsm": round(total_gsm, 2),
                 "weight_per_sheet_kg": round(final_weight_kg, 4),
                 "waste_allowance_percent": waste_allowance_percent,
@@ -400,39 +410,33 @@ class CostingCalculator:
         vat_rate_frac = self.params.vat_rate / 100
         sscl_rate_frac = self.params.sscl_rate / 100
         
-        if "Non-VAT" in self.params.tax_type:
-            # Non-VAT customers (both Inhouse and Outsource):
+        if "Non-VAT" in self.params.tax_type or self.params.tax_type == "Non-VAT":
+            # Non-VAT customers:
             # No final tax is added on at the end stage.
-            # All input taxes (Input VAT + SSCL) were already capitalized into raw material cost in Phase 4/5.
+            # All input taxes (Input VAT + SSCL) were already capitalized into raw material cost.
             breakdown = {
                 "taxable_base": 0.0,
                 "tax_amount": 0.0,
+                "vat_status": "Not Applicable (Non-VAT)",
                 "note": "Non-VAT customer: No output tax added at final stage"
             }
             return 0.0, breakdown
         
-        elif self.params.tax_type == "VAT, Inhouse":
-            # VAT + SSCL on (cost + overhead)
+        else:
+            # VAT customer:
+            # Formula: (SSCL 2.125% on cost after commissions + overhead)
+            # VAT 18% is kept as INACTIVE
             taxable_base = cost_with_profit + overhead
-            vat = taxable_base * vat_rate_frac
+            vat = 0.0
             sscl = taxable_base * sscl_rate_frac
             breakdown = {
                 "taxable_base": round(taxable_base, 2), 
-                f"vat_{self.params.vat_rate}%": round(vat, 2), 
-                f"sscl_{self.params.sscl_rate}%": round(sscl, 2)
+                f"vat_{self.params.vat_rate}%": 0.0,
+                "vat_status": "Inactive",
+                f"sscl_{self.params.sscl_rate}%": round(sscl, 2),
+                "note": "VAT 18% is inactive; SSCL 2.125% applied on (Cost after Commissions + Overhead)"
             }
-            return vat + sscl, breakdown
-        
-        else:  # VAT, Outsource
-            # VAT + SSCL on cost only
-            vat = cost_with_profit * vat_rate_frac
-            sscl = cost_with_profit * sscl_rate_frac
-            breakdown = {
-                "taxable_base": round(cost_with_profit, 2), 
-                f"vat_{self.params.vat_rate}%": round(vat, 2), 
-                f"sscl_{self.params.sscl_rate}%": round(sscl, 2)
-            }
-            return vat + sscl, breakdown
+            return sscl, breakdown
     
     def get_results(self) -> Dict:
         """Return results"""

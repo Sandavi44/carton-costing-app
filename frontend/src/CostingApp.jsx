@@ -409,6 +409,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         board_type: formData.boardType,
         flute_type: formData.fluteType,
         flute_type_2: formData.fluteType2 || formData.fluteType,
+        production_method: formData.productionMethod || 'In-house',
         joining_type: formData.joiningType,
         is_printed: formData.isPrinted,
         white_liner_rate: parseFloat(formData.whiteLinerRate || 0),
@@ -633,6 +634,25 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         </div>
       </div>
 
+      {/* SECTION 3.5: PRODUCTION METHOD */}
+      <div className={`${cardClass} mb-6`}>
+        <h3 className={headingClass}>🏭 Production Method</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Production Method</label>
+            <select name="productionMethod" value={formData.productionMethod || 'In-house'} onChange={handleInputChange} className={selectClass}>
+              <option value="In-house">In-house</option>
+              <option value="Outsource">Outsource</option>
+            </select>
+          </div>
+          <div className={`flex items-center text-sm px-4 py-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700 text-slate-300' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+            {formData.productionMethod === 'Outsource'
+              ? '⚠️ Outsource: Overhead, joining, printing, slotting, bundling and die-cutting costs are excluded from calculation.'
+              : '🏭 In-house: All process costs (overhead, joining, printing, slotting, bundling, die-cutting) apply.'}
+          </div>
+        </div>
+      </div>
+
       {/* SECTION 4: RATES */}
       <div className={`${cardClass} mb-6`}>
         <h3 className={headingClass}>💰 Board Rate</h3>
@@ -656,69 +676,81 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       <div className={`${cardClass} mb-6`}>
         <h3 className={headingClass}>💵 Costs</h3>
         
-        <div className="mb-4">
-          <label className={labelClass}>Total Overhead for Order (Rs.)</label>
-          <input
-            type="number"
-            name="totalOverheadForOrder"
-            placeholder="e.g. 500"
-            value={formData.totalOverheadForOrder}
-            onChange={handleInputChange}
-            className={inputClass}
-            step="0.01"
-          />
-          <p className="text-xxs text-gray-400 mt-1">Order total overhead gets allocated per carton by dividing by quantity.</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className={labelClass}>Joining Method</label>
-            <select name="joiningType" value={formData.joiningType} onChange={handleInputChange} className={selectClass}>
-              <option value="Glued">Glued</option>
-              <option value="Stitched">Stitched</option>
-            </select>
+        {formData.productionMethod === 'Outsource' ? (
+          <div className={`flex items-center gap-3 px-4 py-5 rounded-xl border ${isDark ? 'bg-slate-800/40 border-slate-700 text-slate-400' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="font-semibold text-sm">Outsource mode – All process costs excluded</p>
+              <p className="text-xs mt-0.5 opacity-80">Overhead, joining, printing, slotting, bundling and die-cutting are not included in the costing for outsourced production. Only raw material cost applies.</p>
+            </div>
           </div>
-          
-          <div>
-            <label className={labelClass}>Joining Cost (Rs./carton)</label>
-            <input type="number" name="joiningCost" placeholder="e.g. 2.00" value={formData.joiningCost} onChange={handleInputChange} className={inputClass} step="0.01" />
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="mb-4">
+              <label className={labelClass}>Total Overhead for Order (Rs.)</label>
+              <input
+                type="number"
+                name="totalOverheadForOrder"
+                placeholder="e.g. 500"
+                value={formData.totalOverheadForOrder}
+                onChange={handleInputChange}
+                className={inputClass}
+                step="0.01"
+              />
+              <p className="text-xxs text-gray-400 mt-1">Order total overhead gets allocated per carton by dividing by quantity.</p>
+            </div>
 
-        <div className="flex items-center gap-2 mb-4 cursor-pointer">
-          <input type="checkbox" name="isPrinted" checked={formData.isPrinted} onChange={handleInputChange} id="isPrinted" className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer" />
-          <label htmlFor="isPrinted" className="text-sm font-bold select-none cursor-pointer">Printed Option</label>
-        </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className={labelClass}>Joining Method</label>
+                <select name="joiningType" value={formData.joiningType} onChange={handleInputChange} className={selectClass}>
+                  <option value="Glued">Glued</option>
+                  <option value="Stitched">Stitched</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className={labelClass}>Joining Cost (Rs./carton)</label>
+                <input type="number" name="joiningCost" placeholder="e.g. 2.00" value={formData.joiningCost} onChange={handleInputChange} className={inputClass} step="0.01" />
+              </div>
+            </div>
 
-        {formData.isPrinted && (
-          <div className="mb-4">
-            <label className={labelClass}>Print Cost (Rs./carton)</label>
-            <input
-              type="number"
-              name="printCost"
-              placeholder="e.g. 2.00"
-              value={formData.printCost}
-              onChange={handleInputChange}
-              className={inputClass}
-              step="0.01"
-            />
-          </div>
+            <div className="flex items-center gap-2 mb-4 cursor-pointer">
+              <input type="checkbox" name="isPrinted" checked={formData.isPrinted} onChange={handleInputChange} id="isPrinted" className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer" />
+              <label htmlFor="isPrinted" className="text-sm font-bold select-none cursor-pointer">Printed Option</label>
+            </div>
+
+            {formData.isPrinted && (
+              <div className="mb-4">
+                <label className={labelClass}>Print Cost (Rs./carton)</label>
+                <input
+                  type="number"
+                  name="printCost"
+                  placeholder="e.g. 2.00"
+                  value={formData.printCost}
+                  onChange={handleInputChange}
+                  className={inputClass}
+                  step="0.01"
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Slotting (Rs./carton)</label>
+                <input type="number" name="slottingCost" placeholder="Slotting" value={formData.slottingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
+              </div>
+              <div>
+                <label className={labelClass}>Bundling (Rs./carton)</label>
+                <input type="number" name="bundlingCost" placeholder="Bundling" value={formData.bundlingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
+              </div>
+              <div>
+                <label className={labelClass}>Die-cutting (Rs./carton)</label>
+                <input type="number" name="diecuttingCost" placeholder="Die-cutting" value={formData.diecuttingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
+              </div>
+            </div>
+          </>
         )}
-
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className={labelClass}>Slotting (Rs./carton)</label>
-            <input type="number" name="slottingCost" placeholder="Slotting" value={formData.slottingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
-          </div>
-          <div>
-            <label className={labelClass}>Bundling (Rs./carton)</label>
-            <input type="number" name="bundlingCost" placeholder="Bundling" value={formData.bundlingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
-          </div>
-          <div>
-            <label className={labelClass}>Die-cutting (Rs./carton)</label>
-            <input type="number" name="diecuttingCost" placeholder="Die-cutting" value={formData.diecuttingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
-          </div>
-        </div>
       </div>
 
       {/* SECTION 6: PROFIT & TAX */}
@@ -734,10 +766,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <div>
             <label className={labelClass}>Tax Type</label>
             <select name="taxType" value={formData.taxType} onChange={handleInputChange} className={selectClass}>
-              <option value="Non-VAT, Inhouse">Non-VAT, Inhouse</option>
-              <option value="Non-VAT, Outsource">Non-VAT, Outsource</option>
-              <option value="VAT, Inhouse">VAT, Inhouse</option>
-              <option value="VAT, Outsource">VAT, Outsource</option>
+              <option value="Non-VAT">Non-VAT</option>
+              <option value="VAT">VAT</option>
             </select>
           </div>
         </div>

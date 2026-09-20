@@ -78,6 +78,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         boardType: quote.board_type || 'Whitecut',
         fluteType: quote.flute_type || 'B-Flute',
         fluteType2: quote.flute_type_2 || quote.flute_type || 'B-Flute',
+        productionMethod: quote.production_method || 'In-house',
         joiningType: quote.joining_type || 'Glued',
         isPrinted: quote.is_printed || false,
         whiteLinerRate: quote.board_type === 'Whitecut' ? (quote.white_liner_rate || '') : '',
@@ -97,7 +98,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         bundlingCostManual: true, // Flag as overridden to preserve quote value
         diecuttingCost: quote.diecutting_cost !== undefined ? quote.diecutting_cost.toString() : '',
         profitMargin: quote.profit_margin_percent !== undefined ? quote.profit_margin_percent.toString() : '15',
-        taxType: quote.tax_type || 'Non-VAT, Inhouse',
+        taxType: quote.tax_type?.includes('VAT') && !quote.tax_type?.includes('Non-VAT') ? 'VAT' : 'Non-VAT',
         hasInhouseCommission: quote.has_inhouse_commission || false,
         hasThirdPartyCommission: quote.has_third_party_commission || false,
         thirdPartyCommission: quote.third_party_commission !== undefined ? quote.third_party_commission.toString() : '',
@@ -482,6 +483,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                     ? `${selectedQuote.flute_type || 'B-Flute'} & ${selectedQuote.flute_type_2 || selectedQuote.flute_type || 'B-Flute'}`
                     : (selectedQuote.flute_type || 'B-Flute')}
                 </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
+                <span className="font-semibold">Production Method:</span>
+                <span>{selectedQuote.production_method || 'In-house'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
                 <span className="font-semibold">Quantity:</span>

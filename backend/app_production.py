@@ -120,6 +120,7 @@ class Quote(db.Model):
     board_type = db.Column(db.String(20), nullable=False)
     flute_type = db.Column(db.String(20), nullable=False)  # CORRECTED: added flute type
     flute_type_2 = db.Column(db.String(20), nullable=True)  # Flute type 2 for 5-Ply
+    production_method = db.Column(db.String(20), default="In-house")  # In-house, Outsource
     joining_type = db.Column(db.String(20), nullable=False)
     is_printed = db.Column(db.Boolean, default=False)
     
@@ -296,6 +297,7 @@ def calculate_cost():
             board_type=data.get('board_type'),
             flute_type=data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             flute_type_2=data.get('flute_type_2') or data.get('fluteType2') or data.get('flute_type') or data.get('fluteType', 'B-Flute'),
+            production_method=data.get('production_method') or data.get('productionMethod', 'In-house'),
             joining_type=data.get('joining_type'),
             is_printed=data.get('is_printed', False),
             white_liner_rate=safe_float(data.get('white_liner_rate', 0)),
@@ -367,6 +369,7 @@ def save_quote():
             board_type=data.get('boardType'),
             flute_type=data.get('fluteType') or data.get('flute_type', 'B-Flute'),
             flute_type_2=data.get('fluteType2') or data.get('flute_type_2') or data.get('fluteType') or data.get('flute_type', 'B-Flute'),
+            production_method=data.get('productionMethod') or data.get('production_method', 'In-house'),
             joining_type=data.get('joiningType'),
             is_printed=data.get('isPrinted', False),
             gsm_values=json.dumps(gsm_values),
@@ -471,6 +474,7 @@ def get_quote(quote_id):
             'board_type': quote.board_type,
             'flute_type': quote.flute_type,
             'flute_type_2': getattr(quote, 'flute_type_2', None) or quote.flute_type,
+            'production_method': getattr(quote, 'production_method', 'In-house') or 'In-house',
             'joining_type': quote.joining_type,
             'is_printed': quote.is_printed,
             'gsm_values': json.loads(quote.gsm_values) if quote.gsm_values else [],
@@ -728,10 +732,16 @@ def init_db():
     with app.app_context():
         db.create_all()
         
-        # Ensure flute_type_2 column exists in quotes table
+        # Ensure flute_type_2 and production_method columns exist in quotes table
         try:
             with db.engine.connect() as conn:
                 conn.execute(db.text("ALTER TABLE quotes ADD COLUMN flute_type_2 VARCHAR(20)"))
+                conn.commit()
+        except Exception:
+            pass  # Already exists or not supported
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(db.text("ALTER TABLE quotes ADD COLUMN production_method VARCHAR(20)"))
                 conn.commit()
         except Exception:
             pass  # Already exists or not supported

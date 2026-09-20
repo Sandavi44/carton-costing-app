@@ -45,7 +45,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const wastePerReel = calculatedCost.reel_information?.waste_per_reel_mm ?? calculatedCost.sheet_dimensions.reel_waste_mm;
   const boardArea = calculatedCost.sheet_dimensions.board_area_m2;
   const totalGsm = calculatedCost.material.total_gsm;
-  const wastePercent = calculatedCost.material.waste_allowance_percent ?? (formData.taxType.includes('Inhouse') ? 5.0 : 3.0);
+  const wastePercent = calculatedCost.material.waste_allowance_percent ?? (formData.productionMethod === 'Outsource' ? 3.0 : 5.0);
   const weightPerSheet = calculatedCost.material.weight_per_sheet_kg;
   const rate = calculatedCost.rates.rate_per_kg;
   const rmCostBeforeSscl = calculatedCost.rates.rm_cost_before_sscl ?? (weightPerSheet * rate);
@@ -83,7 +83,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const transport = calculatedCost.transport?.transport_per_carton ?? 0;
 
   const taxType = formData.taxType || calculatedCost.tax?.tax_type || '';
-  const isNonVat = taxType.includes('Non-VAT');
+  const isNonVat = taxType === 'Non-VAT' || taxType.includes('Non-VAT');
   const taxAmount = isNonVat ? 0 : (calculatedCost.tax?.tax_amount_per_carton || 0);
   const finalCost = isNonVat 
     ? (costAfterCommissions + transport) 
@@ -453,29 +453,13 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                   </>
                 ) : (
                   <>
-                    {taxType === 'VAT, Inhouse' ? (
-                      <>
-                        <p className="opacity-70">Formula: (VAT {vatRate}% + SSCL {ssclRate}%) on (Cost after Commissions + Overhead)</p>
-                        <p className="text-blue-500 font-bold mt-1">
-                          Solve: VAT (({costAfterCommissions.toFixed(2)} + {overheadPerCarton.toFixed(2)}) * {vatRate}%) = Rs. {( (costAfterCommissions + overheadPerCarton) * (vatRate / 100) ).toFixed(2)}
-                        </p>
-                        <p className="text-blue-500 font-bold">
-                          Solve: SSCL (({costAfterCommissions.toFixed(2)} + {overheadPerCarton.toFixed(2)}) * {ssclRate}%) = Rs. {( (costAfterCommissions + overheadPerCarton) * (ssclRate / 100) ).toFixed(2)}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="opacity-70">Formula: (VAT {vatRate}% + SSCL {ssclRate}%) on Cost after Commissions</p>
-                        <p className="text-blue-500 font-bold mt-1">
-                          Solve: VAT ({costAfterCommissions.toFixed(2)} * {vatRate}%) = Rs. {( costAfterCommissions * (vatRate / 100) ).toFixed(2)}
-                        </p>
-                        <p className="text-blue-500 font-bold">
-                          Solve: SSCL ({costAfterCommissions.toFixed(2)} * {ssclRate}%) = Rs. {( costAfterCommissions * (ssclRate / 100) ).toFixed(2)}
-                        </p>
-                      </>
-                    )}
+                    <p className="opacity-70">Formula: SSCL {ssclRate}% on (Cost after Commissions + Overhead) — VAT 18% is <span className="line-through">inactive</span></p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Solve: SSCL (({costAfterCommissions.toFixed(2)} + {overheadPerCarton.toFixed(2)}) × {ssclRate}%) = Rs. {taxAmount.toFixed(2)}
+                    </p>
+                    <p className="text-gray-400 mt-0.5 text-xs">VAT 18%: <span className="italic line-through">Inactive</span> — Rs. 0.00</p>
                     <p className="text-blue-500 font-bold mt-2 border-t pt-1.5 dark:border-slate-700">
-                      Total Tax: Rs. {taxAmount.toFixed(2)}
+                      Total Tax (SSCL): Rs. {taxAmount.toFixed(2)}
                     </p>
                   </>
                 )}
