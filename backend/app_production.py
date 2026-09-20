@@ -190,9 +190,25 @@ class SystemParameter(db.Model):
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-# ============================================================================
-# API ENDPOINTS - AUTHENTICATION
-# ============================================================================
+_columns_checked = False
+
+@app.before_request
+def ensure_db_columns_exist():
+    """Ensure newly added columns exist in the database upon startup/first request"""
+    global _columns_checked
+    if not _columns_checked:
+        try:
+            for col_name, col_type in [("flute_type_2", "VARCHAR(20)"), ("production_method", "VARCHAR(20) DEFAULT 'In-house'")]:
+                for tbl in ["quote", "quotes"]:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(db.text(f"ALTER TABLE {tbl} ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+                    except Exception:
+                        pass
+            _columns_checked = True
+        except Exception:
+            pass
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
@@ -732,19 +748,15 @@ def init_db():
     with app.app_context():
         db.create_all()
         
-        # Ensure flute_type_2 and production_method columns exist in quotes table
-        try:
-            with db.engine.connect() as conn:
-                conn.execute(db.text("ALTER TABLE quotes ADD COLUMN flute_type_2 VARCHAR(20)"))
-                conn.commit()
-        except Exception:
-            pass  # Already exists or not supported
-        try:
-            with db.engine.connect() as conn:
-                conn.execute(db.text("ALTER TABLE quotes ADD COLUMN production_method VARCHAR(20)"))
-                conn.commit()
-        except Exception:
-            pass  # Already exists or not supported
+        # Ensure flute_type_2 and production_method columns exist in quote table
+        for col_name, col_type in [("flute_type_2", "VARCHAR(20)"), ("production_method", "VARCHAR(20) DEFAULT 'In-house'")]:
+            for tbl in ["quote", "quotes"]:
+                try:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text(f"ALTER TABLE {tbl} ADD COLUMN {col_name} {col_type}"))
+                        conn.commit()
+                except Exception:
+                    pass  # Column already exists or table doesn't match
         
         # Create admin user
         if not User.query.filter_by(username='admin').first():
