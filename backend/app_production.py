@@ -595,6 +595,36 @@ def get_quote(quote_id):
         return jsonify({'error': str(e)}), 400
 
 
+@app.route('/api/quotes/<int:quote_id>', methods=['DELETE'])
+@jwt_required()
+def delete_quote(quote_id):
+    """Delete a specific quote by ID"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if user and user.is_admin:
+            quote = Quote.query.filter_by(id=quote_id).first()
+        else:
+            quote = Quote.query.filter_by(id=quote_id, user_id=user_id).first()
+
+        if not quote:
+            return jsonify({'error': 'Quote not found'}), 404
+
+        quote_no = f"QT-{str(quote.id).zfill(5)}"
+        db.session.delete(quote)
+        db.session.commit()
+        return jsonify({'message': f'Quote {quote_no} deleted successfully', 'id': quote_id}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Lightweight ping endpoint for uptime monitors to prevent Render cold starts"""
+    return jsonify({'status': 'ok', 'service': 'carton-costing-api'}), 200
+
+
 # ============================================================================
 # API ENDPOINTS - ADMIN
 # ============================================================================

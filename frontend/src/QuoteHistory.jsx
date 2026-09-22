@@ -39,6 +39,31 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
     fetchHistory();
   }, []);
 
+  const [successMsg, setSuccessMsg] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleDeleteQuote = async (quoteId, quoteNo) => {
+    const displayNo = quoteNo || `QT-${String(quoteId).padStart(5, '0')}`;
+    const confirmed = window.confirm(`Are you sure you want to permanently delete quote ${displayNo}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeleteLoading(true);
+    try {
+      await axios.delete(`/api/quotes/${quoteId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      setQuotes(prev => prev.filter(q => q.id !== quoteId));
+      if (selectedQuote && selectedQuote.id === quoteId) setSelectedQuote(null);
+      if (actionPromptQuote && actionPromptQuote.id === quoteId) setActionPromptQuote(null);
+      setSuccessMsg(`Quote ${displayNo} deleted successfully.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete quote');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleRowClick = async (quoteId) => {
     setActionLoading(true);
     try {
@@ -236,6 +261,14 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         </button>
       </div>
 
+      {successMsg && (
+        <div className={`p-4 rounded-2xl mb-6 text-sm font-semibold border ${
+          isDark ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+        }`}>
+          ✅ {successMsg}
+        </div>
+      )}
+
       {/* FILTER CONTROLS */}
       <div className={`p-5 rounded-3xl border mb-6 ${
         isDark ? 'bg-[#131924]/90 border-[#c5a880]/15' : 'bg-[#faf8f5]/90 border-[#dfd5bc]'
@@ -367,7 +400,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                     {new Date(quote.created_at).toLocaleDateString()}{' '}
                     {new Date(quote.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-x-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => handleRowClick(quote.id)}
                       className={`font-semibold px-3 py-1.5 rounded-lg border transition cursor-pointer ${
@@ -377,6 +410,13 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                       }`}
                     >
                       Open Options
+                    </button>
+                    <button
+                      onClick={() => handleDeleteQuote(quote.id, quote.quote_no)}
+                      className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
+                      title="Delete Quote"
+                    >
+                      🗑️
                     </button>
                   </td>
                 </tr>
@@ -394,12 +434,14 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
           }`}>
             <button
               onClick={() => setActionPromptQuote(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold"
+              className="absolute top-4 right-4 text-gray-500 hover:text-black dark:text-gray-300 dark:hover:text-white text-xl font-bold cursor-pointer"
             >
               ✕
             </button>
-            <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Quote Choices ({actionPromptQuote.quote_no || `QT-${String(actionPromptQuote.id).padStart(5, '0')}`})</h3>
-            <p className={`text-sm mb-6 ${isDark ? 'text-slate-300' : 'text-gray-500'}`}>
+            <h3 className={`text-lg font-black mb-2 ${isDark ? 'text-[#f5deb3]' : 'text-[#1a130b]'}`}>
+              Quote Choices ({actionPromptQuote.quote_no || `QT-${String(actionPromptQuote.id).padStart(5, '0')}`})
+            </h3>
+            <p className={`text-sm mb-6 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
               Would you like to view the detailed summary break-down for <strong>{actionPromptQuote.customer_name}</strong> or load its data into the active calculation workspace for editing?
             </p>
 
@@ -432,9 +474,15 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                 💻 Load Costing Data to Workspace (Edit)
               </button>
               <button
+                onClick={() => handleDeleteQuote(actionPromptQuote.id, actionPromptQuote.quote_no)}
+                className="w-full font-bold py-2.5 rounded-2xl transition block text-sm text-center cursor-pointer hover:scale-[1.01] border text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
+              >
+                🗑️ Delete Quote
+              </button>
+              <button
                 onClick={() => setActionPromptQuote(null)}
                 className={`w-full font-semibold py-2.5 rounded-2xl transition block text-xs text-center cursor-pointer border ${
-                  isDark ? 'bg-slate-900 text-slate-400 hover:bg-slate-950' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                  isDark ? 'bg-slate-900 text-slate-400 hover:bg-slate-950' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                 }`}
               >
                 Cancel
@@ -446,21 +494,23 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
 
       {/* DETAIL MODAL */}
       {selectedQuote && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
           <div className={`rounded-3xl shadow-2xl max-w-lg w-full p-8 relative border ${
-            isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30 shadow-black/50' : 'bg-[#fcfaf7] text-[#5c4c36] border-[#dfd5bc]'
+            isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30 shadow-black/50' : 'bg-[#fcfaf7] text-[#2d2417] border-[#dfd5bc]'
           }`}>
             <button
               onClick={() => setSelectedQuote(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold"
+              className="absolute top-4 right-4 text-gray-500 hover:text-black dark:text-gray-300 dark:hover:text-white text-xl font-bold cursor-pointer"
             >
               ✕
             </button>
-            <h3 className={`text-xl font-bold mb-4 border-b pb-2 ${isDark ? 'text-[#d4af37] border-[#c5a880]/20' : 'text-[#8c734b] border-[#dfd5bc]'}`}>
-              📄 Quote Details ({selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`})
+            <h3 className={`text-xl font-black mb-4 border-b-2 pb-2 flex items-center gap-2 ${
+              isDark ? 'text-[#f5deb3] border-[#c5a880]/30' : 'text-[#1a130b] border-[#5c4c36]/30'
+            }`}>
+              <span>📄</span> Quote Details ({selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`})
             </h3>
 
-            <div className={`space-y-3 text-sm ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+            <div className={`space-y-3 text-sm ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
               <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
                 <span className="font-semibold">Customer:</span>
                 <span>{selectedQuote.customer_name}</span>
@@ -577,16 +627,24 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               </div>
             </div>
 
-            <button
-              onClick={() => setSelectedQuote(null)}
-              className={`mt-6 w-full font-bold py-3 rounded-2xl border transition cursor-pointer ${
-                isDark 
-                  ? 'bg-[#1a2332] border-[#c5a880]/30 text-[#d4af37] hover:bg-slate-700' 
-                  : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36] hover:bg-[#eae5d9]/40'
-              }`}
-            >
-              Close
-            </button>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no)}
+                className="font-bold py-3 rounded-2xl border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 text-sm shadow-xs"
+              >
+                🗑️ Delete Quote
+              </button>
+              <button
+                onClick={() => setSelectedQuote(null)}
+                style={{
+                  backgroundColor: isDark ? '#1a2332' : '#2d2417',
+                  color: '#ffffff'
+                }}
+                className="font-extrabold py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-sm text-white"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
