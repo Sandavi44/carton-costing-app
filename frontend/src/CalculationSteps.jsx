@@ -42,6 +42,19 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const dieWidth = parseFloat(formData.dieWidth || calculatedCost.dimensions?.die_width_mm || 0);
   const isDieCut = cartonType !== 'RSC';
 
+  const cartonCategory = calculatedCost.dimensions?.carton_category || calculatedCost.category?.carton_category || (
+    (calculatedCost.sheet_dimensions.board_area_m2 <= 0.450) ? 'S' : (calculatedCost.sheet_dimensions.board_area_m2 <= 0.800) ? 'M' : 'L'
+  );
+  const proposedJoining = calculatedCost.category?.proposed_costs?.joining_cost ?? (
+    formData.joiningType === 'Stitched' ? (H > 0 ? Math.max(0, parseFloat((((H / 25) - 1) * 2).toFixed(2))) : 0) : (cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.5 : 6.0)
+  );
+  const proposedPrint = calculatedCost.category?.proposed_costs?.print_cost ?? (
+    formData.isPrinted ? (cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.0 : 6.0) : 0
+  );
+  const proposedSlotting = calculatedCost.category?.proposed_costs?.slotting_cost ?? (
+    ply === '3-Ply' ? 1.75 : 2.50
+  );
+
   // Retrieve calculated results
   const sheetLength = calculatedCost.sheet_dimensions.sheet_length_mm;
   const sheetWidth = calculatedCost.sheet_dimensions.sheet_width_mm;
@@ -190,6 +203,17 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                 </p>
                 <p className="text-blue-500 font-bold">
                   Convert to m²: {(sheetLength * selectedReel / sheetsPerReel).toFixed(2)} / 1,000,000 = {boardArea.toFixed(4)} m²
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">2. Carton Categorization (Internal Calculation Rule)</p>
+              <div className={solveBoxClass}>
+                <p className="opacity-70">
+                  Categorization Rule: Type S (0 – 0.450 m²), Type M (0.451 – 0.800 m²), Type L (≥ 0.801 m²)
+                </p>
+                <p className="text-blue-500 font-bold mt-1">
+                  Board Area = {boardArea.toFixed(4)} m² → <span className="underline">Carton Category: Type {cartonCategory}</span>
                 </p>
               </div>
             </div>
@@ -358,6 +382,31 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                 <p className="text-blue-500 font-bold mt-1">
                   {`Solve: 2 * (2 * ((${formData.cartonWidth || 0} + ${formData.cartonHeight || 0}) / 1000) + 508 / 1000) = Rs. ${(2 * (2 * (((parseFloat(formData.cartonWidth) || 0) + (parseFloat(formData.cartonHeight) || 0)) / 1000) + 508 / 1000)).toFixed(2)} per carton`}
                 </p>
+              </div>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-sm font-semibold">3. Auto-Proposed Process Costs (Internal Calculation Rules)</p>
+              <div className={solveBoxClass}>
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <span className="font-bold">Joining Cost ({formData.joiningType}): </span>
+                    {formData.joiningType === 'Stitched' ? (
+                      <span>Equation: [({H} / 25) - 1] * 2 = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
+                    ) : (
+                      <span>Category Type {cartonCategory} (Glued: S=3.00, M=4.50, L=6.00) = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
+                    )}
+                  </div>
+                  {formData.isPrinted && (
+                    <div>
+                      <span className="font-bold">Printing Cost: </span>
+                      <span>Category Type {cartonCategory} (S=3.00, M=4.00, L=6.00) = <strong>Rs. {proposedPrint.toFixed(2)}</strong></span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-bold">Slotting Cost: </span>
+                    <span>{ply} (3-Ply = 1.75, 5-Ply = 2.50) = <strong>Rs. {proposedSlotting.toFixed(2)}</strong></span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

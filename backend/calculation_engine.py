@@ -77,6 +77,20 @@ WASTE_ALLOWANCE_PERCENT = 3.0
 VAT_RATE = 0.18  # 18%
 SSCL_RATE = 0.02125  # 2.125%
 
+def determine_carton_category(board_area_m2: float) -> str:
+    """
+    Carton Categorization based on Phase 2 Board Area:
+    Type S: 0 - 0.450 m2
+    Type M: 0.451 - 0.800 m2
+    Type L: 0.801 m2 or above
+    """
+    if board_area_m2 <= 0.450:
+        return "S"
+    elif board_area_m2 <= 0.800:
+        return "M"
+    else:
+        return "L"
+
 
 # ============================================================================
 # DATA CLASSES
@@ -196,6 +210,49 @@ class CostingCalculator:
         total_gsm = self._calculate_total_gsm()
         base_weight_kg = self._calculate_base_weight(total_gsm, board_area_m2)
         final_weight_kg = base_weight_kg * (1 + waste_allowance_percent / 100)
+
+        # Carton categorization based on Board Area (Phase 2):
+        # Type S: 0 - 0.450 m2
+        # Type M: 0.451 - 0.800 m2
+        # Type L: 0.801 m2 or above
+        carton_category = determine_carton_category(board_area_m2)
+
+        # Auto-proposed costs:
+        # (1) Joining method:
+        # Glued: S -> 3.00, M -> 4.50, L -> 6.00
+        # Stitched: [(Carton Height / 25) - 1] * 2
+        if self.params.joining_type == "Stitched":
+            h = getattr(self.params, 'carton_height_mm', 0.0)
+            proposed_joining_cost = max(0.0, round(((h / 25.0) - 1.0) * 2.0, 2)) if h > 0 else 0.0
+        else:
+            if carton_category == "S":
+                proposed_joining_cost = 3.00
+            elif carton_category == "M":
+                proposed_joining_cost = 4.50
+            else:
+                proposed_joining_cost = 6.00
+
+        # (2) Printing cost:
+        # If is_printed: S -> 3.00, M -> 4.00, L -> 6.00; else 0.0
+        if self.params.is_printed:
+            if carton_category == "S":
+                proposed_print_cost = 3.00
+            elif carton_category == "M":
+                proposed_print_cost = 4.00
+            else:
+                proposed_print_cost = 6.00
+        else:
+            proposed_print_cost = 0.00
+
+        # (3) Slotting cost:
+        # If 3 ply: 1.75
+        # If 5 ply: 2.50
+        if self.params.ply_type == "3-Ply":
+            proposed_slotting_cost = 1.75
+        elif self.params.ply_type == "5-Ply":
+            proposed_slotting_cost = 2.50
+        else:
+            proposed_slotting_cost = 2.50
         
         # Rate selection based on board type only
         rate = self._get_rate()
@@ -218,9 +275,9 @@ class CostingCalculator:
             diecutting_cost = 0.0
         else:
             overhead_per_carton = self.params.total_overhead_for_order / self.params.quantity if self.params.quantity > 0 else 0.0
-            joining_cost = self.params.joining_cost
-            print_cost = self.params.print_cost if self.params.is_printed else 0.0
-            slotting_cost = self.params.slotting_cost
+            joining_cost = self.params.joining_cost if (self.params.joining_cost is not None and self.params.joining_cost > 0) else proposed_joining_cost
+            print_cost = (self.params.print_cost if (self.params.print_cost is not None and self.params.print_cost > 0) else proposed_print_cost) if self.params.is_printed else 0.0
+            slotting_cost = self.params.slotting_cost if (self.params.slotting_cost is not None and self.params.slotting_cost > 0) else proposed_slotting_cost
             bundling_cost = self.params.bundling_cost
             diecutting_cost = self.params.diecutting_cost
             
@@ -250,9 +307,10 @@ class CostingCalculator:
         
         # Tax
         tax_per_carton, tax_breakdown = self._calculate_tax(cost_after_commissions, overhead_per_carton)
+        tax_amount_per_carton = tax_per_carton
         
         # Final per-carton cost
-        final_cost_per_carton = cost_after_commissions + transport_per_carton + tax_per_carton
+        final_cost_per_carton = cost_after_commissions + transport_per_carton + tax_amount_per_carton
         
         # Batch cost
         total_cost_batch = final_cost_per_carton * self.params.quantity
@@ -270,6 +328,16 @@ class CostingCalculator:
                 "carton_type": carton_type,
                 "die_length_mm": die_length_mm,
                 "die_width_mm": die_width_mm,
+                "carton_category": carton_category,
+            },
+            "category": {
+                "carton_category": carton_category,
+                "board_area_m2": round(board_area_m2, 4),
+                "proposed_costs": {
+                    "joining_cost": proposed_joining_cost,
+                    "print_cost": proposed_print_cost,
+                    "slotting_cost": proposed_slotting_cost,
+                }
             },
             "sheet_dimensions": {
                 "sheet_length_mm": round(sheet_length, 2),

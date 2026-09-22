@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
 // ============================================================================
@@ -277,6 +277,103 @@ function ReelSlicingDiagram({ calculatedCost, theme }) {
 }
 
 // ============================================================================
+// HELPER: CARTON CATEGORIZATION & PROPOSED COSTS
+// ============================================================================
+
+export const calculateBoardAreaAndCategory = (carton) => {
+  const isRSC = !carton.cartonType || carton.cartonType === 'RSC';
+  const dieL = parseFloat(carton.dieLength) || 0;
+  const dieW = parseFloat(carton.dieWidth) || 0;
+  const L = parseFloat(carton.cartonLength) || 0;
+  const W = parseFloat(carton.cartonWidth) || 0;
+  const H = parseFloat(carton.cartonHeight) || 0;
+  const ply = carton.plyType || '3-Ply';
+
+  let sheetLength = 0;
+  let sheetWidth = 0;
+
+  if (!isRSC && dieL > 0 && dieW > 0) {
+    sheetLength = dieL;
+    sheetWidth = dieW;
+  } else {
+    if (L <= 0 || W <= 0 || H <= 0) {
+      return { boardArea: 0, category: 'S', sheetLength: 0, sheetWidth: 0 };
+    }
+    sheetLength = (L + W) * 2 + (ply === '3-Ply' ? 62 : 75);
+    const wAdj = ply === '3-Ply' ? 26 : (ply === '5-Ply' ? 32 : 36);
+    sheetWidth = (W + H) + wAdj;
+  }
+
+  const REEL_WIDTHS = [
+    950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400,
+    1450, 1500, 1550, 1600, 1650, 1700, 1750, 1800, 1850
+  ];
+  const EDGE_LOSS = 25;
+
+  let bestReel = REEL_WIDTHS[REEL_WIDTHS.length - 1];
+  let minWaste = Infinity;
+  let bestSheetsPerReel = 1;
+
+  for (const reel of REEL_WIDTHS) {
+    const eff = reel - EDGE_LOSS;
+    if (eff >= sheetWidth) {
+      const sheets = Math.floor(eff / sheetWidth);
+      if (sheets > 0) {
+        const waste = reel - (sheets * sheetWidth);
+        const wastePerSheet = waste / sheets;
+        if (wastePerSheet < minWaste) {
+          minWaste = wastePerSheet;
+          bestReel = reel;
+          bestSheetsPerReel = sheets;
+        }
+      }
+    }
+  }
+
+  const boardArea = bestSheetsPerReel > 0
+    ? (sheetLength * bestReel) / bestSheetsPerReel / 1000000
+    : 0;
+
+  let category = 'S';
+  if (boardArea <= 0.450) {
+    category = 'S';
+  } else if (boardArea <= 0.800) {
+    category = 'M';
+  } else {
+    category = 'L';
+  }
+
+  return { boardArea, category, sheetLength, sheetWidth };
+};
+
+export const getProposedCosts = (carton, category) => {
+  // 1. Joining Cost
+  let proposedJoining = 0;
+  if (carton.joiningType === 'Stitched') {
+    const h = parseFloat(carton.cartonHeight) || 0;
+    proposedJoining = h > 0 ? Math.max(0, parseFloat((((h / 25) - 1) * 2).toFixed(2))) : 0;
+  } else {
+    // Glued: S -> 3.00, M -> 4.50, L -> 6.00
+    if (category === 'S') proposedJoining = 3.00;
+    else if (category === 'M') proposedJoining = 4.50;
+    else proposedJoining = 6.00;
+  }
+
+  // 2. Printing Cost: S -> 3.00, M -> 4.00, L -> 6.00
+  let proposedPrint = 0;
+  if (carton.isPrinted) {
+    if (category === 'S') proposedPrint = 3.00;
+    else if (category === 'M') proposedPrint = 4.00;
+    else proposedPrint = 6.00;
+  }
+
+  // 3. Slotting Cost: 3-Ply -> 1.75, 5-Ply -> 2.50
+  let proposedSlotting = carton.plyType === '3-Ply' ? 1.75 : 2.50;
+
+  return { proposedJoining, proposedPrint, proposedSlotting };
+};
+
+// ============================================================================
 // MAIN COSTINGAPP COMPONENT
 // ============================================================================
 
@@ -285,6 +382,29 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   const [loading, setLoading] = useState(false);
   const [nextQuoteNo, setNextQuoteNo] = useState('');
   const isDark = theme === 'dark';
+
+  // Current live category and proposed costs
+  const { boardArea: currentBoardArea, category: currentCategory } = useMemo(() => {
+    return calculateBoardAreaAndCategory(formData);
+  }, [
+    formData.cartonLength,
+    formData.cartonWidth,
+    formData.cartonHeight,
+    formData.cartonType,
+    formData.dieLength,
+    formData.dieWidth,
+    formData.plyType
+  ]);
+
+  const { proposedJoining, proposedPrint, proposedSlotting } = useMemo(() => {
+    return getProposedCosts(formData, currentCategory);
+  }, [
+    formData.joiningType,
+    formData.cartonHeight,
+    formData.isPrinted,
+    formData.plyType,
+    currentCategory
+  ]);
 
   // Fetch next quote number when in new entry mode
   useEffect(() => {
@@ -305,17 +425,72 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     }
   }, [formData.isEditing]);
 
-  // Synchronize bundling cost auto-proposal on load or dimension change
+  // Synchronize auto-proposed process costs (Joining, Print, Slotting, Bundling)
   useEffect(() => {
     const w = parseFloat(formData.cartonWidth) || 0;
     const h = parseFloat(formData.cartonHeight) || 0;
-    if (w > 0 && h > 0 && !formData.bundlingCostManual) {
-      setFormData(prev => ({
-        ...prev,
-        bundlingCost: (2 * (2 * ((w + h) / 1000) + 508 / 1000)).toFixed(2)
-      }));
-    }
-  }, [formData.cartonWidth, formData.cartonHeight, formData.bundlingCostManual]);
+
+    setFormData(prev => {
+      let changed = false;
+      const updated = { ...prev };
+
+      if (prev.cartonCategory !== currentCategory) {
+        updated.cartonCategory = currentCategory;
+        changed = true;
+      }
+
+      // Bundling Cost
+      if (w > 0 && h > 0 && !prev.bundlingCostManual) {
+        const autoBundling = (2 * (2 * ((w + h) / 1000) + 508 / 1000)).toFixed(2);
+        if (prev.bundlingCost !== autoBundling) {
+          updated.bundlingCost = autoBundling;
+          changed = true;
+        }
+      }
+
+      // Joining Cost
+      if (!prev.joiningCostManual) {
+        const joinStr = proposedJoining.toFixed(2);
+        if (prev.joiningCost !== joinStr) {
+          updated.joiningCost = joinStr;
+          changed = true;
+        }
+      }
+
+      // Print Cost
+      if (!prev.printCostManual) {
+        const printStr = prev.isPrinted ? proposedPrint.toFixed(2) : '';
+        if (prev.printCost !== printStr) {
+          updated.printCost = printStr;
+          changed = true;
+        }
+      }
+
+      // Slotting Cost
+      if (!prev.slottingCostManual) {
+        const slotStr = proposedSlotting.toFixed(2);
+        if (prev.slottingCost !== slotStr) {
+          updated.slottingCost = slotStr;
+          changed = true;
+        }
+      }
+
+      return changed ? updated : prev;
+    });
+  }, [
+    currentCategory,
+    proposedJoining,
+    proposedPrint,
+    proposedSlotting,
+    formData.cartonWidth,
+    formData.cartonHeight,
+    formData.bundlingCostManual,
+    formData.joiningCostManual,
+    formData.printCostManual,
+    formData.slottingCostManual,
+    formData.isPrinted,
+    formData.joiningType
+  ]);
 
   // HANDLERS
   const getActiveRateFieldName = (boardType) => {
@@ -339,12 +514,31 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       }
       if (name === 'isPrinted' && !checked) {
         updated.printCost = '';
+        updated.printCostManual = false;
+      }
+      if (name === 'isPrinted' && checked) {
+        updated.printCostManual = false;
       }
       if (name === 'bundlingCost') {
         updated.bundlingCostManual = true;
       }
+      if (name === 'joiningCost') {
+        updated.joiningCostManual = true;
+      }
+      if (name === 'printCost') {
+        updated.printCostManual = true;
+      }
+      if (name === 'slottingCost') {
+        updated.slottingCostManual = true;
+      }
       if (name === 'cartonWidth' || name === 'cartonHeight') {
         updated.bundlingCostManual = false;
+      }
+      if (name === 'joiningType') {
+        updated.joiningCostManual = false;
+      }
+      if (name === 'plyType') {
+        updated.slottingCostManual = false;
       }
       return updated;
     });
@@ -405,8 +599,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         return;
       }
 
-      if (!formData.totalOverheadForOrder || !formData.joiningCost) {
-        setError('Please enter total overhead (for entire order) and joining cost');
+      if (!formData.totalOverheadForOrder) {
+        setError('Please enter total overhead (for entire order)');
         setLoading(false);
         return;
       }
@@ -438,9 +632,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         brown_liner_rate: parseFloat(formData.brownLinerRate || 0),
         gsm_values: gsmArray,
         total_overhead_for_order: parseFloat(formData.totalOverheadForOrder || 0),
-        joining_cost: parseFloat(formData.joiningCost || 0),
-        print_cost: formData.isPrinted ? parseFloat(formData.printCost || 0) : 0,
-        slotting_cost: parseFloat(formData.slottingCost || 0),
+        joining_cost: parseFloat(formData.joiningCost !== '' && formData.joiningCost !== undefined ? formData.joiningCost : (proposedJoining || 0)),
+        print_cost: formData.isPrinted ? parseFloat(formData.printCost !== '' && formData.printCost !== undefined ? formData.printCost : (proposedPrint || 0)) : 0,
+        slotting_cost: parseFloat(formData.slottingCost !== '' && formData.slottingCost !== undefined ? formData.slottingCost : (proposedSlotting || 0)),
         bundling_cost: parseFloat(formData.bundlingCost || 0),
         diecutting_cost: parseFloat(formData.diecuttingCost || 0),
         profit_margin_percent: parseFloat(formData.profitMargin),
@@ -662,6 +856,38 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <label className={labelClass}>Quantity (cartons)</label>
           <input type="number" name="quantity" placeholder="e.g. 1000" value={formData.quantity} onChange={handleInputChange} className={inputClass} />
         </div>
+
+        {currentBoardArea > 0 && (
+          <div className={`mt-5 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border shadow-xs transition-all ${
+            isDark ? 'bg-[#131924]/80 border-[#c5a880]/20' : 'bg-[#faf8f5] border-[#dfd5bc]'
+          }`}>
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">📦</span>
+              <div>
+                <p className="text-xs font-semibold text-slate-400">Carton Categorization (Phase 2 Board Area):</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`px-3 py-0.5 rounded-full text-xs font-black tracking-wide border shadow-xs ${
+                    currentCategory === 'S'
+                      ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                      : currentCategory === 'M'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                      : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                  }`}>
+                    Type {currentCategory}
+                  </span>
+                  <span className="text-xs font-mono font-bold opacity-90">
+                    {currentBoardArea.toFixed(4)} m²
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="text-right text-xxs font-mono opacity-70">
+              {currentCategory === 'S' && 'Rule: Type S (0 – 0.450 m²)'}
+              {currentCategory === 'M' && 'Rule: Type M (0.451 – 0.800 m²)'}
+              {currentCategory === 'L' && 'Rule: Type L (≥ 0.801 m²)'}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* SECTION 2: PLY & BOARD TYPE */}
@@ -802,8 +1028,35 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               </div>
               
               <div>
-                <label className={labelClass}>Joining Cost (Rs./carton)</label>
-                <input type="number" name="joiningCost" placeholder="e.g. 2.00" value={formData.joiningCost} onChange={handleInputChange} className={inputClass} step="0.01" />
+                <div className="flex justify-between items-center mb-1">
+                  <label className={labelClass}>Joining Cost (Rs./carton)</label>
+                  <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
+                    {formData.joiningType === 'Stitched'
+                      ? `Auto: Rs. ${proposedJoining.toFixed(2)} ([(H/25)-1]×2)`
+                      : `Auto: Rs. ${proposedJoining.toFixed(2)} (Type ${currentCategory})`}
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    name="joiningCost"
+                    placeholder="e.g. 2.00"
+                    value={formData.joiningCost}
+                    onChange={handleInputChange}
+                    className={inputClass}
+                    step="0.01"
+                  />
+                  {formData.joiningCostManual && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, joiningCostManual: false, joiningCost: proposedJoining.toFixed(2) }))}
+                      className="absolute right-2 top-2 text-xxs font-bold text-amber-600 dark:text-amber-400 hover:underline bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 cursor-pointer"
+                      title="Reset to auto-proposed value"
+                    >
+                      ↺ Auto
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -814,27 +1067,81 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
             {formData.isPrinted && (
               <div className="mb-4">
-                <label className={labelClass}>Print Cost (Rs./carton)</label>
-                <input
-                  type="number"
-                  name="printCost"
-                  placeholder="e.g. 2.00"
-                  value={formData.printCost}
-                  onChange={handleInputChange}
-                  className={inputClass}
-                  step="0.01"
-                />
+                <div className="flex justify-between items-center mb-1">
+                  <label className={labelClass}>Print Cost (Rs./carton)</label>
+                  <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
+                    Auto: Rs. {proposedPrint.toFixed(2)} (Type {currentCategory})
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    name="printCost"
+                    placeholder="e.g. 2.00"
+                    value={formData.printCost}
+                    onChange={handleInputChange}
+                    className={inputClass}
+                    step="0.01"
+                  />
+                  {formData.printCostManual && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, printCostManual: false, printCost: proposedPrint.toFixed(2) }))}
+                      className="absolute right-2 top-2 text-xxs font-bold text-amber-600 dark:text-amber-400 hover:underline bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 cursor-pointer"
+                      title="Reset to auto-proposed value"
+                    >
+                      ↺ Auto
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className={labelClass}>Slotting (Rs./carton)</label>
-                <input type="number" name="slottingCost" placeholder="Slotting" value={formData.slottingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
+                <div className="flex justify-between items-center mb-1">
+                  <label className={labelClass}>Slotting (Rs./carton)</label>
+                  <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
+                    Auto: Rs. {proposedSlotting.toFixed(2)}
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    name="slottingCost"
+                    placeholder="Slotting"
+                    value={formData.slottingCost}
+                    onChange={handleInputChange}
+                    className={inputClass}
+                    step="0.01"
+                  />
+                  {formData.slottingCostManual && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, slottingCostManual: false, slottingCost: proposedSlotting.toFixed(2) }))}
+                      className="absolute right-2 top-2 text-xxs font-bold text-amber-600 dark:text-amber-400 hover:underline bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 cursor-pointer"
+                      title="Reset to auto-proposed value"
+                    >
+                      ↺ Auto
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <label className={labelClass}>Bundling (Rs./carton)</label>
-                <input type="number" name="bundlingCost" placeholder="Bundling" value={formData.bundlingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
+                <div className="relative">
+                  <input type="number" name="bundlingCost" placeholder="Bundling" value={formData.bundlingCost} onChange={handleInputChange} className={inputClass} step="0.01" />
+                  {formData.bundlingCostManual && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, bundlingCostManual: false }))}
+                      className="absolute right-2 top-2 text-xxs font-bold text-amber-600 dark:text-amber-400 hover:underline bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800 cursor-pointer"
+                      title="Reset to auto-proposed value"
+                    >
+                      ↺ Auto
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <label className={labelClass}>Die-cutting (Rs./carton)</label>
