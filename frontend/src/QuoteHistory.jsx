@@ -428,8 +428,8 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
 
       {/* CHOICE PROMPT MODAL */}
       {actionPromptQuote && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className={`rounded-3xl shadow-2xl max-w-md w-full p-6 relative border ${
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+          <div className={`rounded-3xl shadow-2xl max-w-md w-full p-5 sm:p-6 relative border max-h-[90vh] flex flex-col overflow-y-auto ${
             isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30' : 'bg-[#fcfaf7] text-[#5c4c36] border-[#dfd5bc]'
           }`}>
             <button
@@ -494,23 +494,30 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
 
       {/* DETAIL MODAL */}
       {selectedQuote && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className={`rounded-3xl shadow-2xl max-w-lg w-full p-8 relative border ${
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
+          <div className={`rounded-3xl shadow-2xl max-w-lg w-full p-5 sm:p-6 relative border flex flex-col max-h-[90vh] ${
             isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30 shadow-black/50' : 'bg-[#fcfaf7] text-[#2d2417] border-[#dfd5bc]'
           }`}>
-            <button
-              onClick={() => setSelectedQuote(null)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-black dark:text-gray-300 dark:hover:text-white text-xl font-bold cursor-pointer"
-            >
-              ✕
-            </button>
-            <h3 className={`text-xl font-black mb-4 border-b-2 pb-2 flex items-center gap-2 ${
-              isDark ? 'text-[#f5deb3] border-[#c5a880]/30' : 'text-[#1a130b] border-[#5c4c36]/30'
+            {/* Header (fixed at top of modal) */}
+            <div className={`flex items-center justify-between border-b-2 pb-2.5 mb-3 shrink-0 ${
+              isDark ? 'border-[#c5a880]/30' : 'border-[#5c4c36]/30'
             }`}>
-              <span>📄</span> Quote Details ({selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`})
-            </h3>
+              <h3 className={`text-lg sm:text-xl font-black flex items-center gap-2 ${
+                isDark ? 'text-[#f5deb3]' : 'text-[#1a130b]'
+              }`}>
+                <span>📄</span> Quote Details ({selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`})
+              </h3>
+              <button
+                onClick={() => setSelectedQuote(null)}
+                className="text-gray-500 hover:text-black dark:text-gray-300 dark:hover:text-white text-xl font-bold cursor-pointer p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
 
-            <div className={`space-y-3 text-sm ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+            {/* Scrollable Content Body */}
+            <div className={`space-y-2.5 text-xs sm:text-sm overflow-y-auto pr-2 flex-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
               <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
                 <span className="font-semibold">Customer:</span>
                 <span>{selectedQuote.customer_name}</span>
@@ -588,7 +595,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               )}
 
               {/* Financial parameters */}
-              <div className={`p-4 rounded-2xl border mt-4 space-y-2 text-xs ${
+              <div className={`p-4 rounded-2xl border mt-3 space-y-2 text-xs ${
                 isDark ? 'bg-[#1a2332] border-[#c5a880]/20 text-slate-100' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
               }`}>
                 <div className={`flex justify-between font-semibold ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
@@ -610,7 +617,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   backgroundColor: isDark ? '#1a2332' : '#8c734b',
                   color: isDark ? '#e2d4c0' : '#ffffff'
                 }}
-                className={`mt-6 rounded-2xl p-5 shadow-xs border ${
+                className={`mt-4 rounded-2xl p-4 sm:p-5 shadow-xs border ${
                   isDark 
                     ? 'bg-[#1a2332] text-[#e2d4c0] bg-gradient-to-r from-[#1a2332] to-[#131924] border-[#c5a880]/30' 
                     : 'bg-[#8c734b] text-white bg-gradient-to-r from-[#8c734b] to-[#5c4c36] border-[#dfd5bc]'
@@ -618,19 +625,20 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               >
                 <div className="flex justify-between mb-2">
                   <span className="opacity-95">Cost per Carton:</span>
-                  <span className="text-xl font-bold">Rs. {selectedQuote.final_cost_per_carton}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
+                  <span className="text-lg sm:text-xl font-bold">Rs. {selectedQuote.final_cost_per_carton}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="opacity-95">Total Batch Cost:</span>
-                  <span className="text-xl font-bold">Rs. {selectedQuote.total_cost_batch}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
+                  <span className="text-lg sm:text-xl font-bold">Rs. {selectedQuote.total_cost_batch}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
+            {/* Footer Buttons (fixed at bottom of modal) */}
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-800 grid grid-cols-2 gap-3 shrink-0">
               <button
                 onClick={() => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no)}
-                className="font-bold py-3 rounded-2xl border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 text-sm shadow-xs"
+                className="font-bold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 text-sm shadow-xs"
               >
                 🗑️ Delete Quote
               </button>
@@ -640,7 +648,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   backgroundColor: isDark ? '#1a2332' : '#2d2417',
                   color: '#ffffff'
                 }}
-                className="font-extrabold py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-sm text-white"
+                className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-sm text-white"
               >
                 Close
               </button>
