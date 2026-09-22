@@ -130,6 +130,15 @@ class CostingParameters:
     flute_type_2: str = "B-Flute"  # "B-Flute", "C-Flute" (for 5-Ply/7-Ply)
     production_method: str = "In-house"  # "In-house", "Outsource"
     
+    # Carton Type & Die Dimensions
+    carton_type: str = "RSC"  # "RSC", "Lock Type", "Mail Type", "Special Shape", "S.F."
+    die_length_mm: float = 0.0
+    die_width_mm: float = 0.0
+    
+    # Waste allowances from system parameters (defaults: In-house 5%, Outsource 3%)
+    inhouse_waste_percent: float = 5.0
+    outsource_waste_percent: float = 3.0
+    
     # Profit and tax
     profit_margin_percent: float = 15.0
     tax_type: str = "Non-VAT"
@@ -176,12 +185,12 @@ class CostingCalculator:
         else:
             board_area_m2 = 0.0
         
-        # Determine waste allowance percent based on production method (In-house = 5%, Outsource = 3%)
+        # Determine waste allowance percent based on production method
         prod_method = getattr(self.params, 'production_method', 'In-house')
         if prod_method == "Outsource" or "Outsource" in getattr(self.params, 'tax_type', ''):
-            waste_allowance_percent = 3.0
+            waste_allowance_percent = getattr(self.params, 'outsource_waste_percent', 3.0)
         else:
-            waste_allowance_percent = 5.0
+            waste_allowance_percent = getattr(self.params, 'inhouse_waste_percent', 5.0)
             
         # Weight calculations
         total_gsm = self._calculate_total_gsm()
@@ -208,23 +217,22 @@ class CostingCalculator:
             bundling_cost = 0.0
             diecutting_cost = 0.0
         else:
-            overhead_per_carton = self.params.total_overhead_for_order / self.params.quantity if self.params.quantity > 0 else 0
+            overhead_per_carton = self.params.total_overhead_for_order / self.params.quantity if self.params.quantity > 0 else 0.0
             joining_cost = self.params.joining_cost
-            print_cost = self.params.print_cost if self.params.is_printed else 0
+            print_cost = self.params.print_cost if self.params.is_printed else 0.0
             slotting_cost = self.params.slotting_cost
             bundling_cost = self.params.bundling_cost
             diecutting_cost = self.params.diecutting_cost
-        
-        # Subtotal per carton
+            
+        # Subtotal
         subtotal_per_carton = (rm_cost_per_carton + overhead_per_carton + 
-                               joining_cost + print_cost + slotting_cost + 
-                               bundling_cost + diecutting_cost)
+                              joining_cost + print_cost + slotting_cost + bundling_cost + diecutting_cost)
         
         # Profit
         profit_per_carton = subtotal_per_carton * (self.params.profit_margin_percent / 100)
         cost_with_profit = subtotal_per_carton + profit_per_carton
         
-        # Commissions
+        # Commissions (compounded sequentially)
         if self.params.has_inhouse_commission:
             inhouse_commission = (cost_with_profit * 2) / 98
         else:
@@ -250,11 +258,18 @@ class CostingCalculator:
         total_cost_batch = final_cost_per_carton * self.params.quantity
         
         # Store results
+        carton_type = getattr(self.params, 'carton_type', 'RSC')
+        die_length_mm = getattr(self.params, 'die_length_mm', 0.0)
+        die_width_mm = getattr(self.params, 'die_width_mm', 0.0)
+        
         self.results = {
             "dimensions": {
                 "carton_length_mm": self.params.carton_length_mm,
                 "carton_width_mm": self.params.carton_width_mm,
                 "carton_height_mm": self.params.carton_height_mm,
+                "carton_type": carton_type,
+                "die_length_mm": die_length_mm,
+                "die_width_mm": die_width_mm,
             },
             "sheet_dimensions": {
                 "sheet_length_mm": round(sheet_length, 2),
@@ -331,12 +346,20 @@ class CostingCalculator:
     # ========================================================================
     
     def _calculate_sheet_length(self) -> float:
-        """Calculate sheet length based on ply type"""
+        """Calculate sheet length based on ply type (or die size if not RSC)"""
+        carton_type = getattr(self.params, 'carton_type', 'RSC')
+        die_length = getattr(self.params, 'die_length_mm', 0.0)
+        if carton_type != 'RSC' and die_length > 0:
+            return float(die_length)
         formula = SHEET_LENGTH_FORMULAS[self.params.ply_type]
         return formula(self.params.carton_length_mm, self.params.carton_width_mm)
     
     def _calculate_sheet_width(self) -> float:
-        """Calculate sheet width based on ply type"""
+        """Calculate sheet width based on ply type (or die size if not RSC)"""
+        carton_type = getattr(self.params, 'carton_type', 'RSC')
+        die_width = getattr(self.params, 'die_width_mm', 0.0)
+        if carton_type != 'RSC' and die_width > 0:
+            return float(die_width)
         adjustment = SHEET_WIDTH_ADJUSTMENTS[self.params.ply_type]
         return (self.params.carton_width_mm + self.params.carton_height_mm) + adjustment
     

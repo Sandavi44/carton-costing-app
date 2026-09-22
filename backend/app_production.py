@@ -116,6 +116,9 @@ class Quote(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     
     # Material specifications
+    carton_type = db.Column(db.String(50), default="RSC")  # RSC, Lock Type, Mail Type, Special Shape, S.F.
+    die_length_mm = db.Column(db.Float, nullable=True, default=0.0)
+    die_width_mm = db.Column(db.Float, nullable=True, default=0.0)
     ply_type = db.Column(db.String(20), nullable=False)
     board_type = db.Column(db.String(20), nullable=False)
     flute_type = db.Column(db.String(20), nullable=False)  # CORRECTED: added flute type
@@ -198,7 +201,14 @@ def ensure_db_columns_exist():
     global _columns_checked
     if not _columns_checked:
         try:
-            for col_name, col_type in [("flute_type_2", "VARCHAR(20)"), ("production_method", "VARCHAR(20) DEFAULT 'In-house'")]:
+            migration_cols = [
+                ("flute_type_2", "VARCHAR(20)"),
+                ("production_method", "VARCHAR(20) DEFAULT 'In-house'"),
+                ("carton_type", "VARCHAR(50) DEFAULT 'RSC'"),
+                ("die_length_mm", "FLOAT DEFAULT 0.0"),
+                ("die_width_mm", "FLOAT DEFAULT 0.0"),
+            ]
+            for col_name, col_type in migration_cols:
                 for tbl in ["quote", "quotes"]:
                     try:
                         with db.engine.connect() as conn:
@@ -206,6 +216,19 @@ def ensure_db_columns_exist():
                             conn.commit()
                     except Exception:
                         pass
+
+            default_params = [
+                ('inhouse_waste_percent', '5', 'Inhouse Waste allowance %'),
+                ('outsource_waste_percent', '3', 'Outsource Waste allowance %'),
+            ]
+            for p_name, val, desc in default_params:
+                try:
+                    if not SystemParameter.query.filter_by(parameter_name=p_name).first():
+                        db.session.add(SystemParameter(parameter_name=p_name, value=val, description=desc))
+                        db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
             _columns_checked = True
         except Exception:
             pass
@@ -273,6 +296,21 @@ def demo_login():
         return jsonify({'error': str(e)}), 400
 
 
+@app.route('/api/quotes/next-number', methods=['GET'])
+@jwt_required()
+def get_next_quote_number():
+    """Get the next sequential quote number for display in enter/new mode"""
+    try:
+        last_quote = Quote.query.order_by(Quote.id.desc()).first()
+        next_id = (last_quote.id + 1) if last_quote else 1
+        return jsonify({
+            'next_id': next_id,
+            'quote_no': f"QT-{str(next_id).zfill(5)}"
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
 # ============================================================================
 # API ENDPOINTS - CALCULATION
 # ============================================================================
@@ -303,6 +341,12 @@ def calculate_cost():
         trans_param = SystemParameter.query.filter_by(parameter_name='transport_rate_per_km').first()
         transport_rate = safe_float(trans_param.value) if trans_param else 10.0
         
+        inhouse_waste_param = SystemParameter.query.filter_by(parameter_name='inhouse_waste_percent').first() or SystemParameter.query.filter_by(parameter_name='waste_allowance_percent').first()
+        inhouse_waste_rate = safe_float(inhouse_waste_param.value) if inhouse_waste_param else 5.0
+        
+        outsource_waste_param = SystemParameter.query.filter_by(parameter_name='outsource_waste_percent').first()
+        outsource_waste_rate = safe_float(outsource_waste_param.value) if outsource_waste_param else 3.0
+        
         # Create parameters with corrected logic
         params = CostingParameters(
             carton_length_mm=safe_float(data.get('carton_length_mm')),
@@ -314,6 +358,11 @@ def calculate_cost():
             flute_type=data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             flute_type_2=data.get('flute_type_2') or data.get('fluteType2') or data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             production_method=data.get('production_method') or data.get('productionMethod', 'In-house'),
+            carton_type=data.get('carton_type') or data.get('cartonType', 'RSC'),
+            die_length_mm=safe_float(data.get('die_length_mm') or data.get('dieLength', 0)),
+            die_width_mm=safe_float(data.get('die_width_mm') or data.get('dieWidth', 0)),
+            inhouse_waste_percent=inhouse_waste_rate,
+            outsource_waste_percent=outsource_waste_rate,
             joining_type=data.get('joining_type'),
             is_printed=data.get('is_printed', False),
             white_liner_rate=safe_float(data.get('white_liner_rate', 0)),
@@ -386,6 +435,9 @@ def save_quote():
             flute_type=data.get('fluteType') or data.get('flute_type', 'B-Flute'),
             flute_type_2=data.get('fluteType2') or data.get('flute_type_2') or data.get('fluteType') or data.get('flute_type', 'B-Flute'),
             production_method=data.get('productionMethod') or data.get('production_method', 'In-house'),
+            carton_type=data.get('cartonType') or data.get('carton_type', 'RSC'),
+            die_length_mm=safe_float(data.get('dieLength') or data.get('die_length_mm', 0)),
+            die_width_mm=safe_float(data.get('dieWidth') or data.get('die_width_mm', 0)),
             joining_type=data.get('joiningType'),
             is_printed=data.get('isPrinted', False),
             gsm_values=json.dumps(gsm_values),
@@ -456,7 +508,11 @@ def get_quote_history():
                 'customer_name': quote.customer_name,
                 'dimensions': f"{quote.carton_length_mm}×{quote.carton_width_mm}×{quote.carton_height_mm}",
                 'ply_type': quote.ply_type,
+                'carton_type': getattr(quote, 'carton_type', 'RSC') or 'RSC',
+                'die_length_mm': getattr(quote, 'die_length_mm', 0.0) or 0.0,
+                'die_width_mm': getattr(quote, 'die_width_mm', 0.0) or 0.0,
                 'quantity': quote.quantity,
+                'tax_type': quote.tax_type,
                 'final_cost_per_carton': quote.final_cost_per_carton,
                 'total_cost_batch': quote.total_cost_batch,
                 'created_at': quote.created_at.isoformat() + 'Z'
@@ -491,6 +547,9 @@ def get_quote(quote_id):
             'flute_type': quote.flute_type,
             'flute_type_2': getattr(quote, 'flute_type_2', None) or quote.flute_type,
             'production_method': getattr(quote, 'production_method', 'In-house') or 'In-house',
+            'carton_type': getattr(quote, 'carton_type', 'RSC') or 'RSC',
+            'die_length_mm': getattr(quote, 'die_length_mm', 0.0) or 0.0,
+            'die_width_mm': getattr(quote, 'die_width_mm', 0.0) or 0.0,
             'joining_type': quote.joining_type,
             'is_printed': quote.is_printed,
             'gsm_values': json.loads(quote.gsm_values) if quote.gsm_values else [],
@@ -771,7 +830,9 @@ def init_db():
             ('sscl_rate', '2.125', 'SSCL rate %'),
             ('input_tax_rate', '18', 'Input tax rate % for Non-VAT customers'),
             ('transport_rate_per_km', '10', 'Transport cost per km'),
-            ('waste_allowance_percent', '3', 'Waste allowance %'),
+            ('waste_allowance_percent', '5', 'Inhouse Waste allowance %'),
+            ('inhouse_waste_percent', '5', 'Inhouse Waste allowance %'),
+            ('outsource_waste_percent', '3', 'Outsource Waste allowance %'),
         ]
         
         for param_name, value, description in default_params:

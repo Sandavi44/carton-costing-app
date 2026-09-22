@@ -281,10 +281,29 @@ function ReelSlicingDiagram({ calculatedCost, theme }) {
 // ============================================================================
 
 export default function CostingApp({ formData, setFormData, calculatedCost, setCalculatedCost, theme }) {
-  // STATE
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [nextQuoteNo, setNextQuoteNo] = useState('');
   const isDark = theme === 'dark';
+
+  // Fetch next quote number when in new entry mode
+  useEffect(() => {
+    const fetchNextNumber = async () => {
+      try {
+        const response = await axios.get('/api/quotes/next-number', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+        });
+        if (response.data?.quote_no) {
+          setNextQuoteNo(response.data.quote_no);
+        }
+      } catch (e) {
+        // Fallback or non-blocking
+      }
+    };
+    if (!formData.isEditing) {
+      fetchNextNumber();
+    }
+  }, [formData.isEditing]);
 
   // Synchronize bundling cost auto-proposal on load or dimension change
   useEffect(() => {
@@ -410,6 +429,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         flute_type: formData.fluteType,
         flute_type_2: formData.fluteType2 || formData.fluteType,
         production_method: formData.productionMethod || 'In-house',
+        carton_type: formData.cartonType || 'RSC',
+        die_length_mm: parseFloat(formData.dieLength || 0),
+        die_width_mm: parseFloat(formData.dieWidth || 0),
         joining_type: formData.joiningType,
         is_printed: formData.isPrinted,
         white_liner_rate: parseFloat(formData.whiteLinerRate || 0),
@@ -524,9 +546,24 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     <div className={`rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-left border ${
       isDark ? 'bg-[#0f141e]/90 text-white border-[#c5a880]/20 shadow-black/50' : 'bg-[#fcfaf7] text-[#5c4c36] border-[#e8dfc7] shadow-xl'
     }`}>
-      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-        <span>🏭</span> Enter Costing Parameters
-      </h2>
+      <div className="flex flex-wrap justify-between items-center mb-6 gap-2">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <span>🏭</span> Enter Costing Parameters
+        </h2>
+        {(formData.quoteNo || nextQuoteNo) && (
+          <span className={`px-4 py-1.5 rounded-full text-sm font-extrabold tracking-wide border shadow-xs ${
+            formData.isEditing
+              ? isDark 
+                ? 'bg-amber-950/60 text-[#d4af37] border-[#d4af37]/40' 
+                : 'bg-amber-100/80 text-[#8c734b] border-[#8c734b]/40'
+              : isDark 
+                ? 'bg-[#1a2332] text-[#d4af37] border-[#c5a880]/30' 
+                : 'bg-[#faf8f5] text-[#8c734b] border-[#dfd5bc]'
+          }`}>
+            {formData.isEditing ? `✏️ Editing: ${formData.quoteNo}` : `📋 Next Quote: ${nextQuoteNo}`}
+          </span>
+        )}
+      </div>
 
       {error && (
         <div className="bg-red-100 border-l-4 border-red-600 p-4 mb-6 rounded-lg text-sm">
@@ -549,19 +586,74 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             className={inputClass}
           />
         </div>
+
+        {/* CARTON TYPE DROPDOWN */}
+        <div className="mb-4">
+          <label className={labelClass}>Carton Type</label>
+          <select
+            name="cartonType"
+            value={formData.cartonType || 'RSC'}
+            onChange={handleInputChange}
+            className={selectClass}
+          >
+            <option value="RSC">1. RSC (Regular Slotted Carton)</option>
+            <option value="Lock Type">2. Lock Type</option>
+            <option value="Mail Type">3. Mail Type</option>
+            <option value="Special Shape">4. Special Shape</option>
+            <option value="S.F.">5. S.F.</option>
+          </select>
+        </div>
+
+        {/* DIE SIZE INPUTS (shown when carton type is not RSC: Lock Type, Mail Type, Special Shape, S.F.) */}
+        {formData.cartonType && formData.cartonType !== 'RSC' && (
+          <div className={`p-4 rounded-2xl mb-4 border transition-all duration-200 ${
+            isDark ? 'bg-purple-950/20 border-purple-800/40 text-purple-200' : 'bg-purple-50 border-purple-200 text-purple-900'
+          }`}>
+            <p className="text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <span>✂️</span> Die Size (mm) — Direct Board Size
+            </p>
+            <p className="text-xs opacity-80 mb-3">
+              For {formData.cartonType}, the die dimensions below are directly used as the board sheet dimensions (Sheet Length & Sheet Width).
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Die Length (mm) [L]</label>
+                <input
+                  type="number"
+                  name="dieLength"
+                  placeholder="Die Length (mm)"
+                  value={formData.dieLength || ''}
+                  onChange={handleInputChange}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Die Width (mm) [W]</label>
+                <input
+                  type="number"
+                  name="dieWidth"
+                  placeholder="Die Width (mm)"
+                  value={formData.dieWidth || ''}
+                  onChange={handleInputChange}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Horizontal Sequential Spaces for L, W, H */}
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div>
-            <label className={labelClass}>Length (mm)</label>
+            <label className={labelClass}>Carton Length (mm)</label>
             <input type="number" name="cartonLength" placeholder="L" value={formData.cartonLength} onChange={handleInputChange} className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>Width (mm)</label>
+            <label className={labelClass}>Carton Width (mm)</label>
             <input type="number" name="cartonWidth" placeholder="W" value={formData.cartonWidth} onChange={handleInputChange} className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>Height (mm)</label>
+            <label className={labelClass}>Carton Height (mm)</label>
             <input type="number" name="cartonHeight" placeholder="H" value={formData.cartonHeight} onChange={handleInputChange} className={inputClass} />
           </div>
         </div>

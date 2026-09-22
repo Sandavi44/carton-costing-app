@@ -37,6 +37,11 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const g4 = parseFloat(formData.gsm4) || 0;
   const g5 = parseFloat(formData.gsm5) || 0;
 
+  const cartonType = formData.cartonType || calculatedCost.dimensions?.carton_type || 'RSC';
+  const dieLength = parseFloat(formData.dieLength || calculatedCost.dimensions?.die_length_mm || 0);
+  const dieWidth = parseFloat(formData.dieWidth || calculatedCost.dimensions?.die_width_mm || 0);
+  const isDieCut = cartonType !== 'RSC';
+
   // Retrieve calculated results
   const sheetLength = calculatedCost.sheet_dimensions.sheet_length_mm;
   const sheetWidth = calculatedCost.sheet_dimensions.sheet_width_mm;
@@ -121,24 +126,54 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
         <div className={cardClass}>
           <h3 className={phaseHeaderClass}>Phase 1: Sheet Dimensions</h3>
           <div className="space-y-4">
-            <div>
-              <p className="text-sm font-semibold">1. Sheet Length Calculation</p>
-              <div className={solveBoxClass}>
-                <p className="opacity-70">Equation: {ply === '3-Ply' ? 'Length = (L + W) * 2 + 62' : 'Length = (L + W) * 2 + 75'}</p>
-                <p className="text-blue-500 font-bold mt-1">
-                  Solve: ({L} + {W}) * 2 + {ply === '3-Ply' ? 62 : 75} = {sheetLength.toFixed(2)} mm
-                </p>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-semibold">2. Sheet Width Calculation</p>
-              <div className={solveBoxClass}>
-                <p className="opacity-70">Equation: Width = (W + H) + X (X: 3-Ply = 26, 5-Ply = 32, 7-Ply = 36)</p>
-                <p className="text-blue-500 font-bold mt-1">
-                  Solve: ({W} + {H}) + {ply === '3-Ply' ? 26 : ply === '5-Ply' ? 32 : 36} = {sheetWidth.toFixed(2)} mm
-                </p>
-              </div>
-            </div>
+            {isDieCut ? (
+              <>
+                <div className={`p-3 rounded-xl mb-3 text-xs font-medium border ${
+                  isDark ? 'bg-purple-950/40 text-purple-200 border-purple-800/40' : 'bg-purple-50 text-purple-900 border-purple-200'
+                }`}>
+                  ✂️ <strong>Carton Type: {cartonType}</strong> — Die-cut carton dimensions are applied directly to board/sheet size.
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">1. Sheet Length Calculation</p>
+                  <div className={solveBoxClass}>
+                    <p className="opacity-70">Equation: Sheet Length = Die Length (Direct Board Dimension)</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Solve: Die Length = {sheetLength.toFixed(2)} mm
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">2. Sheet Width Calculation</p>
+                  <div className={solveBoxClass}>
+                    <p className="opacity-70">Equation: Sheet Width = Die Width (Direct Board Dimension)</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Solve: Die Width = {sheetWidth.toFixed(2)} mm
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="text-sm font-semibold">1. Sheet Length Calculation</p>
+                  <div className={solveBoxClass}>
+                    <p className="opacity-70">Equation: {ply === '3-Ply' ? 'Length = (L + W) * 2 + 62' : 'Length = (L + W) * 2 + 75'}</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Solve: ({L} + {W}) * 2 + {ply === '3-Ply' ? 62 : 75} = {sheetLength.toFixed(2)} mm
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">2. Sheet Width Calculation</p>
+                  <div className={solveBoxClass}>
+                    <p className="opacity-70">Equation: Width = (W + H) + X (X: 3-Ply = 26, 5-Ply = 32, 7-Ply = 36)</p>
+                    <p className="text-blue-500 font-bold mt-1">
+                      Solve: ({W} + {H}) + {ply === '3-Ply' ? 26 : ply === '5-Ply' ? 32 : 36} = {sheetWidth.toFixed(2)} mm
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -197,7 +232,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                   Solve: {((totalGsm * boardArea) / 1000).toFixed(4)} kg * (1 + {wastePercent}%) = {weightPerSheet.toFixed(4)} kg per sheet
                 </p>
                 <p className="text-xxs opacity-70 mt-1">
-                  (Waste allowance rule: Inhouse sourcing = 5.0%, Outsource sourcing = 3.0%)
+                  (Applied waste allowance: {wastePercent}% for {formData.productionMethod || 'In-house'} sourcing)
                 </p>
               </div>
             </div>

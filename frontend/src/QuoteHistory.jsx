@@ -79,6 +79,11 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         fluteType: quote.flute_type || 'B-Flute',
         fluteType2: quote.flute_type_2 || quote.flute_type || 'B-Flute',
         productionMethod: quote.production_method || 'In-house',
+        cartonType: quote.carton_type || 'RSC',
+        dieLength: quote.die_length_mm !== undefined && quote.die_length_mm !== 0 ? quote.die_length_mm.toString() : '',
+        dieWidth: quote.die_width_mm !== undefined && quote.die_width_mm !== 0 ? quote.die_width_mm.toString() : '',
+        quoteNo: quote.quote_no || `QT-${String(quote.id).padStart(5, '0')}`,
+        isEditing: true,
         joiningType: quote.joining_type || 'Glued',
         isPrinted: quote.is_printed || false,
         whiteLinerRate: quote.board_type === 'Whitecut' ? (quote.white_liner_rate || '') : '',
@@ -123,6 +128,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         board_type: newFormData.boardType,
         flute_type: newFormData.fluteType,
         flute_type_2: newFormData.fluteType2 || newFormData.fluteType,
+        production_method: newFormData.productionMethod || 'In-house',
+        carton_type: newFormData.cartonType || 'RSC',
+        die_length_mm: parseFloat(newFormData.dieLength || 0),
+        die_width_mm: parseFloat(newFormData.dieWidth || 0),
         joining_type: newFormData.joiningType,
         is_printed: newFormData.isPrinted,
         gsm_values: JSON.stringify(gsmValues),
@@ -468,6 +477,16 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                 <span className="font-semibold">Height:</span>
                 <span>{selectedQuote.dimensions.height_mm} mm</span>
               </div>
+              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
+                <span className="font-semibold">Carton Type:</span>
+                <span>{selectedQuote.carton_type || 'RSC'}</span>
+              </div>
+              {selectedQuote.carton_type && selectedQuote.carton_type !== 'RSC' && selectedQuote.die_length_mm && selectedQuote.die_width_mm ? (
+                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700 text-purple-500 font-semibold">
+                  <span className="font-semibold">Die Size (L × W):</span>
+                  <span>{selectedQuote.die_length_mm} × {selectedQuote.die_width_mm} mm</span>
+                </div>
+              ) : null}
               <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
                 <span className="font-semibold">Ply Type:</span>
                 <span>{selectedQuote.ply_type}</span>
