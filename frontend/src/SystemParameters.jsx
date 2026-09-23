@@ -88,7 +88,14 @@ export default function SystemParameters({ theme }) {
                 : 'bg-white border-[#dfd5bc] text-[#5c4c36] hover:bg-[#faf8f5]'
             }`}>
               <div>
-                <p className={`font-semibold capitalize ${isDark ? 'text-slate-200' : 'text-[#5c4c36]'}`}>{key.replace(/_/g, ' ')}</p>
+                <p className={`font-semibold capitalize ${isDark ? 'text-slate-200' : 'text-[#5c4c36]'}`}>
+                  {key.replace(/_/g, ' ')}
+                  {key.includes('board_rate') && (
+                    <span className="ml-2 text-xxs px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      Rs./kg
+                    </span>
+                  )}
+                </p>
                 <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-[#8c734b]/80'}`}>{key}</p>
               </div>
 

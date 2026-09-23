@@ -220,6 +220,8 @@ def ensure_db_columns_exist():
             default_params = [
                 ('inhouse_waste_percent', '5', 'Inhouse Waste allowance %'),
                 ('outsource_waste_percent', '3', 'Outsource Waste allowance %'),
+                ('white_liner_board_rate', '285', 'White Liner Board Rate (Rs./kg)'),
+                ('brown_liner_board_rate', '260', 'Brown Liner Board Rate (Rs./kg)'),
             ]
             for p_name, val, desc in default_params:
                 try:
@@ -350,6 +352,20 @@ def calculate_cost():
         prod_method = data.get('production_method') or data.get('productionMethod', 'In-house')
         is_outsource = prod_method == 'Outsource'
 
+        white_liner_param = SystemParameter.query.filter_by(parameter_name='white_liner_board_rate').first()
+        default_white_liner = safe_float(white_liner_param.value) if white_liner_param else 285.0
+
+        brown_liner_param = SystemParameter.query.filter_by(parameter_name='brown_liner_board_rate').first()
+        default_brown_liner = safe_float(brown_liner_param.value) if brown_liner_param else 260.0
+
+        board_type = data.get('board_type') or data.get('boardType') or 'Browncut'
+        req_white = safe_float(data.get('white_liner_rate', 0))
+        req_brown = safe_float(data.get('brown_liner_rate', 0))
+        if board_type == 'Whitecut' and req_white <= 0:
+            req_white = default_white_liner
+        elif board_type != 'Whitecut' and req_brown <= 0:
+            req_brown = default_brown_liner
+
         # Create parameters with corrected logic
         params = CostingParameters(
             carton_length_mm=safe_float(data.get('carton_length_mm')),
@@ -357,7 +373,7 @@ def calculate_cost():
             carton_height_mm=safe_float(data.get('carton_height_mm')),
             quantity=safe_int(data.get('quantity')),
             ply_type=data.get('ply_type'),
-            board_type=data.get('board_type'),
+            board_type=board_type,
             flute_type=data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             flute_type_2=data.get('flute_type_2') or data.get('fluteType2') or data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             production_method=prod_method,
@@ -368,8 +384,8 @@ def calculate_cost():
             outsource_waste_percent=outsource_waste_rate,
             joining_type=data.get('joining_type'),
             is_printed=data.get('is_printed', False),
-            white_liner_rate=safe_float(data.get('white_liner_rate', 0)),
-            brown_liner_rate=safe_float(data.get('brown_liner_rate', 0)),
+            white_liner_rate=req_white,
+            brown_liner_rate=req_brown,
             gsm_values=gsm_values,
             total_overhead_for_order=0.0 if is_outsource else safe_float(data.get('total_overhead_for_order', 0)),
             joining_cost=0.0 if is_outsource else safe_float(data.get('joining_cost', 0)),
@@ -870,6 +886,8 @@ def init_db():
             ('waste_allowance_percent', '5', 'Inhouse Waste allowance %'),
             ('inhouse_waste_percent', '5', 'Inhouse Waste allowance %'),
             ('outsource_waste_percent', '3', 'Outsource Waste allowance %'),
+            ('white_liner_board_rate', '285', 'White Liner Board Rate (Rs./kg)'),
+            ('brown_liner_board_rate', '260', 'Brown Liner Board Rate (Rs./kg)'),
         ]
         
         for param_name, value, description in default_params:

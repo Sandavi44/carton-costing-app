@@ -381,7 +381,88 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [nextQuoteNo, setNextQuoteNo] = useState('');
+  const [systemRates, setSystemRates] = useState({
+    whiteLinerRate: '285',
+    brownLinerRate: '260',
+  });
   const isDark = theme === 'dark';
+
+  // Fetch live system parameters (White Liner rate & Brown Liner rate) from admin parameters
+  useEffect(() => {
+    const fetchSystemRates = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+        const res = await axios.get('/api/admin/parameters', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data) {
+          const white = res.data.white_liner_board_rate ? String(res.data.white_liner_board_rate) : '285';
+          const brown = res.data.brown_liner_board_rate ? String(res.data.brown_liner_board_rate) : '260';
+          setSystemRates({
+            whiteLinerRate: white,
+            brownLinerRate: brown,
+          });
+
+          // Sync default rate into form if it is empty or matches previous default
+          setFormData(prev => {
+            const activeField = prev.boardType === 'Whitecut' ? 'whiteLinerRate' : 'brownLinerRate';
+            const currentVal = prev[activeField];
+            if (!currentVal || currentVal === '285' || currentVal === '260') {
+              return {
+                ...prev,
+                [activeField]: prev.boardType === 'Whitecut' ? white : brown,
+                totalOverheadForOrder: prev.totalOverheadForOrder || '1000'
+              };
+            }
+            return prev;
+          });
+        }
+      } catch (e) {
+        // Fallback or non-blocking
+      }
+    };
+    fetchSystemRates();
+  }, []);
+
+  // Ensure initial defaults for Board Type, GSMs, and Total Overhead
+  useEffect(() => {
+    setFormData(prev => {
+      let changed = false;
+      const updated = { ...prev };
+      if (!updated.boardType) {
+        updated.boardType = 'Browncut';
+        changed = true;
+      }
+      if (updated.boardType === 'Browncut' && !updated.brownLinerRate) {
+        updated.brownLinerRate = systemRates.brownLinerRate || '260';
+        changed = true;
+      }
+      if (updated.boardType === 'Whitecut' && !updated.whiteLinerRate) {
+        updated.whiteLinerRate = systemRates.whiteLinerRate || '285';
+        changed = true;
+      }
+      if (updated.plyType === '3-Ply' && (!updated.gsm1 && !updated.gsm2 && !updated.gsm3)) {
+        updated.gsm1 = '140';
+        updated.gsm2 = '112';
+        updated.gsm3 = '140';
+        changed = true;
+      }
+      if (updated.plyType === '5-Ply' && (!updated.gsm1 && !updated.gsm2 && !updated.gsm3)) {
+        updated.gsm1 = '140';
+        updated.gsm2 = '112';
+        updated.gsm3 = '112';
+        updated.gsm4 = '112';
+        updated.gsm5 = '140';
+        changed = true;
+      }
+      if (updated.productionMethod !== 'Outsource' && !updated.totalOverheadForOrder) {
+        updated.totalOverheadForOrder = '1000';
+        changed = true;
+      }
+      return changed ? updated : prev;
+    });
+  }, [systemRates]);
 
   // Current live category and proposed costs
   const { boardArea: currentBoardArea, category: currentCategory } = useMemo(() => {
@@ -505,10 +586,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         [name]: type === 'checkbox' ? checked : value
       };
       if (name === 'boardType') {
-        const activeField = getActiveRateFieldName(updated.boardType);
-        if (activeField === 'whiteLinerRate') {
+        if (value === 'Whitecut') {
+          updated.whiteLinerRate = systemRates.whiteLinerRate || '285';
           updated.brownLinerRate = '';
         } else {
+          updated.brownLinerRate = systemRates.brownLinerRate || '260';
           updated.whiteLinerRate = '';
         }
       }
@@ -539,9 +621,30 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       }
       if (name === 'plyType') {
         updated.slottingCostManual = false;
+        if (value === '3-Ply') {
+          updated.gsm1 = '140';
+          updated.gsm2 = '112';
+          updated.gsm3 = '140';
+          updated.gsm4 = '';
+          updated.gsm5 = '';
+          updated.gsm6 = '';
+          updated.gsm7 = '';
+        } else if (value === '5-Ply') {
+          updated.gsm1 = '140';
+          updated.gsm2 = '112';
+          updated.gsm3 = '112';
+          updated.gsm4 = '112';
+          updated.gsm5 = '140';
+          updated.gsm6 = '';
+          updated.gsm7 = '';
+        }
       }
-      if (name === 'productionMethod' && value === 'Outsource') {
-        setError('');
+      if (name === 'productionMethod') {
+        if (value === 'Outsource') {
+          setError('');
+        } else if (value === 'In-house' && (!updated.totalOverheadForOrder || updated.totalOverheadForOrder === '0')) {
+          updated.totalOverheadForOrder = '1000';
+        }
       }
       return updated;
     });
@@ -937,8 +1040,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <div>
             <label className={labelClass}>Board Type</label>
             <select name="boardType" value={formData.boardType} onChange={handleInputChange} className={selectClass}>
-              <option value="Whitecut">White Liner</option>
               <option value="Browncut">Brown Liner</option>
+              <option value="Whitecut">White Liner</option>
             </select>
           </div>
         </div>
@@ -985,7 +1088,14 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
       {/* SECTION 4: RATES */}
       <div className={`${cardClass} mb-6`}>
-        <h3 className={headingClass}>💰 Board Rate</h3>
+        <div className="flex justify-between items-center mb-4 border-b pb-2">
+          <h3 className={`${headingClass} mb-0 border-b-0 pb-0`}>💰 Board Rate</h3>
+          <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
+            {formData.boardType === 'Whitecut' 
+              ? `Auto: Rs. ${systemRates.whiteLinerRate || '285'}/kg (White Liner)`
+              : `Auto: Rs. ${systemRates.brownLinerRate || '260'}/kg (Brown Liner)`}
+          </span>
+        </div>
         <div>
           <label className={labelClass}>
             {formData.boardType === 'Whitecut' ? 'White Liner Rate (Rs./kg)' : 'Brown Liner Rate (Rs./kg)'}
@@ -993,7 +1103,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <input
             type="number"
             name={getActiveRateFieldName(formData.boardType)}
-            placeholder="e.g. 350.00"
+            placeholder={formData.boardType === 'Whitecut' ? (systemRates.whiteLinerRate || '285.00') : (systemRates.brownLinerRate || '260.00')}
             value={formData[getActiveRateFieldName(formData.boardType)]}
             onChange={handleInputChange}
             className={inputClass}
@@ -1021,13 +1131,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               <input
                 type="number"
                 name="totalOverheadForOrder"
-                placeholder="e.g. 500"
+                placeholder="1000"
                 value={formData.totalOverheadForOrder}
                 onChange={handleInputChange}
                 className={inputClass}
                 step="0.01"
               />
-              <p className="text-xxs text-gray-400 mt-1">Order total overhead gets allocated per carton by dividing by quantity.</p>
+              <p className="text-xxs text-gray-400 mt-1">Order total overhead gets allocated per carton by dividing by quantity (Auto-filled: Rs. 1000).</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
