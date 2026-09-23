@@ -540,6 +540,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       if (name === 'plyType') {
         updated.slottingCostManual = false;
       }
+      if (name === 'productionMethod' && value === 'Outsource') {
+        setError('');
+      }
       return updated;
     });
   };
@@ -599,7 +602,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         return;
       }
 
-      if (!formData.totalOverheadForOrder) {
+      const isOutsource = formData.productionMethod === 'Outsource';
+
+      if (!isOutsource && !formData.totalOverheadForOrder) {
         setError('Please enter total overhead (for entire order)');
         setLoading(false);
         return;
@@ -631,12 +636,12 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         white_liner_rate: parseFloat(formData.whiteLinerRate || 0),
         brown_liner_rate: parseFloat(formData.brownLinerRate || 0),
         gsm_values: gsmArray,
-        total_overhead_for_order: parseFloat(formData.totalOverheadForOrder || 0),
-        joining_cost: parseFloat(formData.joiningCost !== '' && formData.joiningCost !== undefined ? formData.joiningCost : (proposedJoining || 0)),
-        print_cost: formData.isPrinted ? parseFloat(formData.printCost !== '' && formData.printCost !== undefined ? formData.printCost : (proposedPrint || 0)) : 0,
-        slotting_cost: parseFloat(formData.slottingCost !== '' && formData.slottingCost !== undefined ? formData.slottingCost : (proposedSlotting || 0)),
-        bundling_cost: parseFloat(formData.bundlingCost || 0),
-        diecutting_cost: parseFloat(formData.diecuttingCost || 0),
+        total_overhead_for_order: isOutsource ? 0 : parseFloat(formData.totalOverheadForOrder || 0),
+        joining_cost: isOutsource ? 0 : parseFloat(formData.joiningCost !== '' && formData.joiningCost !== undefined ? formData.joiningCost : (proposedJoining || 0)),
+        print_cost: (!isOutsource && formData.isPrinted) ? parseFloat(formData.printCost !== '' && formData.printCost !== undefined ? formData.printCost : (proposedPrint || 0)) : 0,
+        slotting_cost: isOutsource ? 0 : parseFloat(formData.slottingCost !== '' && formData.slottingCost !== undefined ? formData.slottingCost : (proposedSlotting || 0)),
+        bundling_cost: isOutsource ? 0 : parseFloat(formData.bundlingCost || 0),
+        diecutting_cost: isOutsource ? 0 : parseFloat(formData.diecuttingCost || 0),
         profit_margin_percent: parseFloat(formData.profitMargin),
         tax_type: formData.taxType,
         hasInhouseCommission: formData.hasInhouseCommission,
@@ -685,8 +690,15 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         }
       };
 
+      const isOutsource = formData.productionMethod === 'Outsource';
       const response = await axios.post('/api/quotes/save', { 
         ...formData, 
+        totalOverheadForOrder: isOutsource ? 0 : (formData.totalOverheadForOrder || 0),
+        joiningCost: isOutsource ? 0 : formData.joiningCost,
+        printCost: isOutsource ? 0 : formData.printCost,
+        slottingCost: isOutsource ? 0 : formData.slottingCost,
+        bundlingCost: isOutsource ? 0 : formData.bundlingCost,
+        diecuttingCost: isOutsource ? 0 : formData.diecuttingCost,
         gsm_values: gsmArray, 
         calculated_cost: payloadCalculatedCost 
       }, {

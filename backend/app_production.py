@@ -347,6 +347,9 @@ def calculate_cost():
         outsource_waste_param = SystemParameter.query.filter_by(parameter_name='outsource_waste_percent').first()
         outsource_waste_rate = safe_float(outsource_waste_param.value) if outsource_waste_param else 3.0
         
+        prod_method = data.get('production_method') or data.get('productionMethod', 'In-house')
+        is_outsource = prod_method == 'Outsource'
+
         # Create parameters with corrected logic
         params = CostingParameters(
             carton_length_mm=safe_float(data.get('carton_length_mm')),
@@ -357,7 +360,7 @@ def calculate_cost():
             board_type=data.get('board_type'),
             flute_type=data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             flute_type_2=data.get('flute_type_2') or data.get('fluteType2') or data.get('flute_type') or data.get('fluteType', 'B-Flute'),
-            production_method=data.get('production_method') or data.get('productionMethod', 'In-house'),
+            production_method=prod_method,
             carton_type=data.get('carton_type') or data.get('cartonType', 'RSC'),
             die_length_mm=safe_float(data.get('die_length_mm') or data.get('dieLength', 0)),
             die_width_mm=safe_float(data.get('die_width_mm') or data.get('dieWidth', 0)),
@@ -368,12 +371,12 @@ def calculate_cost():
             white_liner_rate=safe_float(data.get('white_liner_rate', 0)),
             brown_liner_rate=safe_float(data.get('brown_liner_rate', 0)),
             gsm_values=gsm_values,
-            total_overhead_for_order=safe_float(data.get('total_overhead_for_order', 0)),
-            joining_cost=safe_float(data.get('joining_cost', 0)),
-            print_cost=safe_float(data.get('print_cost', 0)) if data.get('is_printed') else 0,
-            slotting_cost=safe_float(data.get('slotting_cost', 0)),
-            bundling_cost=safe_float(data.get('bundling_cost', 0)),
-            diecutting_cost=safe_float(data.get('diecutting_cost', 0)),
+            total_overhead_for_order=0.0 if is_outsource else safe_float(data.get('total_overhead_for_order', 0)),
+            joining_cost=0.0 if is_outsource else safe_float(data.get('joining_cost', 0)),
+            print_cost=0.0 if is_outsource else (safe_float(data.get('print_cost', 0)) if data.get('is_printed') else 0),
+            slotting_cost=0.0 if is_outsource else safe_float(data.get('slotting_cost', 0)),
+            bundling_cost=0.0 if is_outsource else safe_float(data.get('bundling_cost', 0)),
+            diecutting_cost=0.0 if is_outsource else safe_float(data.get('diecutting_cost', 0)),
             profit_margin_percent=safe_float(data.get('profit_margin_percent', 15)),
             tax_type=data.get('tax_type', 'Non-VAT, Inhouse'),
             sscl_rate=sscl_rate,
@@ -416,8 +419,12 @@ def save_quote():
         if isinstance(gsm_values, str):
             gsm_values = json.loads(gsm_values)
         
-        # Calculate overhead per carton
-        total_overhead = safe_float(data.get('totalOverheadForOrder', 0))
+        # Determine production method
+        production_method = data.get('productionMethod') or data.get('production_method', 'In-house')
+        is_outsource = production_method == 'Outsource'
+
+        # Calculate overhead per carton (0 if Outsource)
+        total_overhead = 0.0 if is_outsource else safe_float(data.get('totalOverheadForOrder', 0))
         quantity = safe_int(data.get('quantity', 1))
         overhead_per_carton = total_overhead / quantity if quantity > 0 else 0
         
@@ -434,7 +441,7 @@ def save_quote():
             board_type=data.get('boardType'),
             flute_type=data.get('fluteType') or data.get('flute_type', 'B-Flute'),
             flute_type_2=data.get('fluteType2') or data.get('flute_type_2') or data.get('fluteType') or data.get('flute_type', 'B-Flute'),
-            production_method=data.get('productionMethod') or data.get('production_method', 'In-house'),
+            production_method=production_method,
             carton_type=data.get('cartonType') or data.get('carton_type', 'RSC'),
             die_length_mm=safe_float(data.get('dieLength') or data.get('die_length_mm', 0)),
             die_width_mm=safe_float(data.get('dieWidth') or data.get('die_width_mm', 0)),
@@ -445,11 +452,11 @@ def save_quote():
             brown_liner_rate=safe_float(data.get('brownLinerRate', 0)),
             total_overhead_for_order=total_overhead,
             overhead_per_carton=overhead_per_carton,
-            joining_cost=safe_float(data.get('joiningCost', 0)),
-            print_cost=safe_float(data.get('printCost', 0)),
-            slotting_cost=safe_float(data.get('slottingCost', 0)),
-            bundling_cost=safe_float(data.get('bundlingCost', 0)),
-            diecutting_cost=safe_float(data.get('diecuttingCost', 0)),
+            joining_cost=0.0 if is_outsource else safe_float(data.get('joiningCost', 0)),
+            print_cost=0.0 if is_outsource else safe_float(data.get('printCost', 0)),
+            slotting_cost=0.0 if is_outsource else safe_float(data.get('slottingCost', 0)),
+            bundling_cost=0.0 if is_outsource else safe_float(data.get('bundlingCost', 0)),
+            diecutting_cost=0.0 if is_outsource else safe_float(data.get('diecuttingCost', 0)),
             profit_margin_percent=safe_float(data.get('profitMargin', 15)),
             tax_type=data.get('taxType'),
             delivery_required=data.get('deliveryRequired', False),
