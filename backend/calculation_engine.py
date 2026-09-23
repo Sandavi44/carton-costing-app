@@ -13,7 +13,8 @@ import math
 # ============================================================================
 
 class PlyType(Enum):
-    """Ply types: 3-Ply, 5-Ply, 7-Ply"""
+    """Ply types: 2-Ply, 3-Ply, 5-Ply, 7-Ply"""
+    TWO_PLY = "2-Ply"
     THREE_PLY = "3-Ply"
     FIVE_PLY = "5-Ply"
     SEVEN_PLY = "7-Ply"
@@ -58,6 +59,7 @@ REEL_EDGE_LOSS_MM = 25  # 12.5mm top + 12.5mm bottom
 
 # Sheet Length Formulas (depends on ply type)
 SHEET_LENGTH_FORMULAS = {
+    "2-Ply": lambda L, W: (L + W) * 2 + 62,
     "3-Ply": lambda L, W: (L + W) * 2 + 62,
     "5-Ply": lambda L, W: (L + W) * 2 + 75,
     "7-Ply": lambda L, W: (L + W) * 2 + 75,
@@ -65,6 +67,7 @@ SHEET_LENGTH_FORMULAS = {
 
 # Sheet Width Adjustments (depends on ply type)
 SHEET_WIDTH_ADJUSTMENTS = {
+    "2-Ply": 26,
     "3-Ply": 26,
     "5-Ply": 32,
     "7-Ply": 36,
@@ -119,7 +122,7 @@ class CostingParameters:
     quantity: int
     
     # Material specifications
-    ply_type: str  # "3-Ply", "5-Ply", "7-Ply"
+    ply_type: str  # "2-Ply", "3-Ply", "5-Ply", "7-Ply"
     board_type: str  # "Whitecut", "Bluecut"
     flute_type: str  # "B-Flute", "C-Flute"
     joining_type: str  # "Glued", "Stitched"
@@ -245,9 +248,9 @@ class CostingCalculator:
             proposed_print_cost = 0.00
 
         # (3) Slotting cost:
-        # If 3 ply: 1.75
+        # If 2 ply / 3 ply: 1.75
         # If 5 ply: 2.50
-        if self.params.ply_type == "3-Ply":
+        if self.params.ply_type in ["2-Ply", "3-Ply"]:
             proposed_slotting_cost = 1.75
         elif self.params.ply_type == "5-Ply":
             proposed_slotting_cost = 2.50
@@ -465,7 +468,13 @@ class CostingCalculator:
         flute_2 = getattr(self.params, 'flute_type_2', None) or self.params.flute_type
         wave_factor_2 = 1.35 if flute_2 == "B-Flute" else 1.43
         
-        if self.params.ply_type == "3-Ply":
+        if self.params.ply_type == "2-Ply":
+            # 2-Ply: Liner 1 (Outer 1) + (Flute 1 × Factor 1)
+            g0 = gsm[0] if len(gsm) > 0 else 0
+            g1 = gsm[1] if len(gsm) > 1 else 0
+            return g0 + (g1 * wave_factor_1)
+        
+        elif self.params.ply_type == "3-Ply":
             # 3-Ply: Liner 1 + (Flute 1 × Factor) + Liner 2
             return gsm[0] + (gsm[1] * wave_factor_1) + gsm[2]
         

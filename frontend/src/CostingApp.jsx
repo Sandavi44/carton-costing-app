@@ -299,8 +299,8 @@ export const calculateBoardAreaAndCategory = (carton) => {
     if (L <= 0 || W <= 0 || H <= 0) {
       return { boardArea: 0, category: 'S', sheetLength: 0, sheetWidth: 0 };
     }
-    sheetLength = (L + W) * 2 + (ply === '3-Ply' ? 62 : 75);
-    const wAdj = ply === '3-Ply' ? 26 : (ply === '5-Ply' ? 32 : 36);
+    sheetLength = (L + W) * 2 + (ply === '2-Ply' || ply === '3-Ply' ? 62 : 75);
+    const wAdj = (ply === '2-Ply' || ply === '3-Ply') ? 26 : (ply === '5-Ply' ? 32 : 36);
     sheetWidth = (W + H) + wAdj;
   }
 
@@ -367,8 +367,8 @@ export const getProposedCosts = (carton, category) => {
     else proposedPrint = 6.00;
   }
 
-  // 3. Slotting Cost: 3-Ply -> 1.75, 5-Ply -> 2.50
-  let proposedSlotting = carton.plyType === '3-Ply' ? 1.75 : 2.50;
+  // 3. Slotting Cost: 2-Ply / 3-Ply -> 1.75, 5-Ply -> 2.50
+  let proposedSlotting = (carton.plyType === '2-Ply' || carton.plyType === '3-Ply') ? 1.75 : 2.50;
 
   return { proposedJoining, proposedPrint, proposedSlotting };
 };
@@ -440,6 +440,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       }
       if (updated.boardType === 'Whitecut' && !updated.whiteLinerRate) {
         updated.whiteLinerRate = systemRates.whiteLinerRate || '285';
+        changed = true;
+      }
+      if (updated.plyType === '2-Ply' && (!updated.gsm1 && !updated.gsm2)) {
+        updated.gsm1 = '140';
+        updated.gsm2 = '112';
         changed = true;
       }
       if (updated.plyType === '3-Ply' && (!updated.gsm1 && !updated.gsm2 && !updated.gsm3)) {
@@ -621,7 +626,15 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       }
       if (name === 'plyType') {
         updated.slottingCostManual = false;
-        if (value === '3-Ply') {
+        if (value === '2-Ply') {
+          updated.gsm1 = '140';
+          updated.gsm2 = '112';
+          updated.gsm3 = '';
+          updated.gsm4 = '';
+          updated.gsm5 = '';
+          updated.gsm6 = '';
+          updated.gsm7 = '';
+        } else if (value === '3-Ply') {
           updated.gsm1 = '140';
           updated.gsm2 = '112';
           updated.gsm3 = '140';
@@ -652,6 +665,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
   const getGSMFields = () => {
     switch(formData.plyType) {
+      case '2-Ply':
+        return [
+          { name: 'gsm1', label: 'Outer 1 (Liner)', value: formData.gsm1 },
+          { name: 'gsm2', label: 'Flute 1', value: formData.gsm2 },
+        ];
       case '3-Ply':
         return [
           { name: 'gsm1', label: 'Outer 1 (Liner)', value: formData.gsm1 },
@@ -1013,6 +1031,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <div>
             <label className={labelClass}>Ply Type</label>
             <select name="plyType" value={formData.plyType} onChange={handleInputChange} className={selectClass}>
+              <option value="2-Ply">2-Ply</option>
               <option value="3-Ply">3-Ply</option>
               <option value="5-Ply">5-Ply</option>
               <option value="7-Ply">7-Ply</option>
@@ -1020,7 +1039,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           </div>
           
           <div>
-            <label className={labelClass}>{formData.plyType === '5-Ply' ? 'Flute Type 1' : 'Flute Type'}</label>
+            <label className={labelClass}>{formData.plyType === '5-Ply' || formData.plyType === '2-Ply' ? 'Flute Type 1' : 'Flute Type'}</label>
             <select name="fluteType" value={formData.fluteType} onChange={handleInputChange} className={selectClass}>
               <option value="B-Flute">B-Flute (1.35)</option>
               <option value="C-Flute">C-Flute (1.43)</option>

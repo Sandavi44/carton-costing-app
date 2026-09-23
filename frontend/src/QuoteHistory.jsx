@@ -81,6 +81,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
   // Helper to get GSM fields list based on ply type
   const getGSMFields = (plyType) => {
     switch(plyType) {
+      case '2-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }];
       case '3-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }];
       case '5-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }, { name: 'gsm4' }, { name: 'gsm5' }];
       case '7-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }, { name: 'gsm4' }, { name: 'gsm5' }, { name: 'gsm6' }, { name: 'gsm7' }];

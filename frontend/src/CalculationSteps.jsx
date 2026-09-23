@@ -52,7 +52,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
     formData.isPrinted ? (cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.0 : 6.0) : 0
   );
   const proposedSlotting = calculatedCost.category?.proposed_costs?.slotting_cost ?? (
-    ply === '3-Ply' ? 1.75 : 2.50
+    (ply === '2-Ply' || ply === '3-Ply') ? 1.75 : 2.50
   );
 
   // Retrieve calculated results
@@ -170,18 +170,18 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                 <div>
                   <p className="text-sm font-semibold">1. Sheet Length Calculation</p>
                   <div className={solveBoxClass}>
-                    <p className="opacity-70">Equation: {ply === '3-Ply' ? 'Length = (L + W) * 2 + 62' : 'Length = (L + W) * 2 + 75'}</p>
+                    <p className="opacity-70">Equation: {(ply === '2-Ply' || ply === '3-Ply') ? 'Length = (L + W) * 2 + 62' : 'Length = (L + W) * 2 + 75'}</p>
                     <p className="text-blue-500 font-bold mt-1">
-                      Solve: ({L} + {W}) * 2 + {ply === '3-Ply' ? 62 : 75} = {sheetLength.toFixed(2)} mm
+                      Solve: ({L} + {W}) * 2 + {(ply === '2-Ply' || ply === '3-Ply') ? 62 : 75} = {sheetLength.toFixed(2)} mm
                     </p>
                   </div>
                 </div>
                 <div>
                   <p className="text-sm font-semibold">2. Sheet Width Calculation</p>
                   <div className={solveBoxClass}>
-                    <p className="opacity-70">Equation: Width = (W + H) + X (X: 3-Ply = 26, 5-Ply = 32, 7-Ply = 36)</p>
+                    <p className="opacity-70">Equation: Width = (W + H) + X (X: 2-Ply/3-Ply = 26, 5-Ply = 32, 7-Ply = 36)</p>
                     <p className="text-blue-500 font-bold mt-1">
-                      Solve: ({W} + {H}) + {ply === '3-Ply' ? 26 : ply === '5-Ply' ? 32 : 36} = {sheetWidth.toFixed(2)} mm
+                      Solve: ({W} + {H}) + {(ply === '2-Ply' || ply === '3-Ply') ? 26 : ply === '5-Ply' ? 32 : 36} = {sheetWidth.toFixed(2)} mm
                     </p>
                   </div>
                 </div>
@@ -228,11 +228,13 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
               <p className="text-sm font-semibold">1. Total GSM (with Wave Factor)</p>
               <div className={solveBoxClass}>
                 <p className="opacity-70">
+                  {ply === '2-Ply' && `Equation: Total GSM = Liner 1 (Outer 1) + Flute 1 * Flute Factor (${wf1})`}
                   {ply === '3-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Factor (${wf1}) + Liner 2 (Outer Liner)`}
                   {ply === '5-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Type 1 Factor (${wf1}) + Liner 2 (Middle) + Flute 2 * Flute Type 2 Factor (${wf2}) + Liner 3 (Outer Liner)`}
                   {ply === '7-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Type 1 Factor (${wf1}) + Liner 2 + Flute 2 * Flute Type 2 Factor (${wf2}) + Liner 3 + Flute 3 * Flute Type 1 Factor (${wf1}) + Liner 4`}
                 </p>
                 <p className="text-blue-500 font-bold mt-1">
+                  {ply === '2-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) = ${g1} + ${(g2 * wf1).toFixed(2)} = ${totalGsm.toFixed(2)} gsm`}
                   {ply === '3-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) + ${g3} = ${g1} + ${(g2 * wf1).toFixed(2)} + ${g3} = ${totalGsm.toFixed(2)} gsm`}
                   {ply === '5-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) + ${g3} + (${g4} * ${wf2}) + ${g5} = ${g1} + ${(g2 * wf1).toFixed(2)} + ${g3} + ${(g4 * wf2).toFixed(2)} + ${g5} = ${totalGsm.toFixed(2)} gsm`}
                   {ply === '7-Ply' && `Solve: Total GSM = ${totalGsm.toFixed(2)} gsm`}
