@@ -64,12 +64,17 @@ function App() {
     transportCost: '',
   });
   const [calculatedCost, setCalculatedCost] = useState(null);
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const getInitialTheme = () => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark' || saved === 'sand' || saved === 'green') return saved;
+    return 'green';
+  };
 
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('theme', nextTheme);
+  const [theme, setTheme] = useState(getInitialTheme);
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
   };
 
   useEffect(() => {
@@ -112,27 +117,37 @@ function App() {
   }, []);
 
   if (!token) {
-    return <Login onLoginSuccess={handleLoginSuccess} theme={theme} toggleTheme={toggleTheme} />;
+    return <Login onLoginSuccess={handleLoginSuccess} theme={theme} setTheme={handleThemeChange} />;
   }
+
+  const isDark = theme === 'dark';
+  const isSand = theme === 'sand';
+  const isGreen = !isDark && !isSand;
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${
-      theme === 'dark' 
+      isDark 
         ? 'bg-gradient-to-br from-[#0c0f17] via-[#080b11] to-[#040609] text-[#e2d4c0]' 
-        : 'bg-gradient-to-br from-[#fbfaf8] via-[#f7f5f0] to-[#eae5d9] text-[#5c4c36]'
+        : isSand
+          ? 'bg-gradient-to-br from-[#fbfaf8] via-[#f7f5f0] to-[#eae5d9] text-[#5c4c36]'
+          : 'bg-gradient-to-br from-[#f4faf4] via-[#ecf7ed] to-[#dcf0dc] text-[#14532d]'
     }`}>
       {/* Navigation Header */}
       <nav className={`shadow-xl border-b transition-colors duration-300 ${
-        theme === 'dark' 
+        isDark 
           ? 'bg-[#131924]/90 border-[#c5a880]/20 text-[#e2d4c0]' 
-          : 'bg-[#faf8f5]/90 border-[#e8dfc7] text-[#5c4c36]'
+          : isSand
+            ? 'bg-[#faf8f5]/90 border-[#e8dfc7] text-[#5c4c36]'
+            : 'bg-[#eaf5ea]/90 border-[#bbf7d0] text-[#14532d]'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <span className={`text-xl font-bold tracking-wide ${theme === 'dark' ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+                <span className={`text-xl font-bold tracking-wide ${
+                  isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#15803d]'
+                }`}>
                   📦 Carton Costing System
                 </span>
               </div>
@@ -142,10 +157,12 @@ function App() {
                   onClick={() => setActiveTab('calculator')}
                   className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition cursor-pointer ${
                     activeTab === 'calculator'
-                      ? theme === 'dark' ? 'border-[#d4af37] text-[#d4af37]' : 'border-[#8c734b] text-[#8c734b]'
-                      : theme === 'dark'
+                      ? isDark ? 'border-[#d4af37] text-[#d4af37]' : isSand ? 'border-[#8c734b] text-[#8c734b]' : 'border-[#16a34a] text-[#15803d]'
+                      : isDark
                         ? 'border-transparent text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                        : 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-gray-700'
+                        : isSand
+                          ? 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-[#5c4c36]'
+                          : 'border-transparent text-emerald-800/70 hover:border-[#bbf7d0] hover:text-emerald-950'
                   }`}
                 >
                   Calculator
@@ -154,10 +171,12 @@ function App() {
                   onClick={() => setActiveTab('steps')}
                   className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition cursor-pointer ${
                     activeTab === 'steps'
-                      ? theme === 'dark' ? 'border-[#d4af37] text-[#d4af37]' : 'border-[#8c734b] text-[#8c734b]'
-                      : theme === 'dark'
+                      ? isDark ? 'border-[#d4af37] text-[#d4af37]' : isSand ? 'border-[#8c734b] text-[#8c734b]' : 'border-[#16a34a] text-[#15803d]'
+                      : isDark
                         ? 'border-transparent text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                        : 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-gray-700'
+                        : isSand
+                          ? 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-[#5c4c36]'
+                          : 'border-transparent text-emerald-800/70 hover:border-[#bbf7d0] hover:text-emerald-950'
                   }`}
                 >
                   Calculation Logic
@@ -166,10 +185,12 @@ function App() {
                   onClick={() => setActiveTab('history')}
                   className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition cursor-pointer ${
                     activeTab === 'history'
-                      ? theme === 'dark' ? 'border-[#d4af37] text-[#d4af37]' : 'border-[#8c734b] text-[#8c734b]'
-                      : theme === 'dark'
+                      ? isDark ? 'border-[#d4af37] text-[#d4af37]' : isSand ? 'border-[#8c734b] text-[#8c734b]' : 'border-[#16a34a] text-[#15803d]'
+                      : isDark
                         ? 'border-transparent text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                        : 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-gray-700'
+                        : isSand
+                          ? 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-[#5c4c36]'
+                          : 'border-transparent text-emerald-800/70 hover:border-[#bbf7d0] hover:text-emerald-950'
                   }`}
                 >
                   Quote History
@@ -179,10 +200,12 @@ function App() {
                     onClick={() => setActiveTab('parameters')}
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition cursor-pointer ${
                       activeTab === 'parameters'
-                        ? theme === 'dark' ? 'border-[#d4af37] text-[#d4af37]' : 'border-[#8c734b] text-[#8c734b]'
-                        : theme === 'dark'
+                        ? isDark ? 'border-[#d4af37] text-[#d4af37]' : isSand ? 'border-[#8c734b] text-[#8c734b]' : 'border-[#16a34a] text-[#15803d]'
+                        : isDark
                           ? 'border-transparent text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                          : 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-gray-700'
+                          : isSand
+                            ? 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-[#5c4c36]'
+                            : 'border-transparent text-emerald-800/70 hover:border-[#bbf7d0] hover:text-emerald-950'
                     }`}
                   >
                     System Parameters
@@ -191,24 +214,67 @@ function App() {
               </div>
             </div>
             
-            {/* Right Header Side (Theme Toggle, User & Logout) */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={toggleTheme}
-                className={`p-2 rounded-lg border transition cursor-pointer text-lg ${
-                  theme === 'dark' 
-                    ? 'bg-[#1a2332] border-[#c5a880]/30 text-yellow-400 hover:bg-slate-700' 
-                    : 'bg-[#fcfbfa] border-[#dfd5bc] text-[#8c734b] hover:bg-gray-100'
-                }`}
-                title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              >
-                {theme === 'dark' ? '☀️' : '🌙'}
-              </button>
-              <span className={`text-sm hidden md:inline ${theme === 'dark' ? 'text-slate-300' : 'text-[#8c734b]'}`}>
-                Logged in as <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-[#5c4c36]'}`}>{user?.username}</span>
+            {/* Right Header Side (Theme Switcher, User & Logout) */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              {/* Segmented 3-Theme Switcher */}
+              <div className={`flex items-center p-0.5 sm:p-1 rounded-xl border text-xs font-semibold shadow-xs transition-colors ${
+                isDark
+                  ? 'bg-[#1a2332] border-[#c5a880]/30 text-slate-300'
+                  : isSand
+                    ? 'bg-[#efebe1] border-[#dfd5bc] text-[#5c4c36]'
+                    : 'bg-[#dcfce7] border-[#bbf7d0] text-[#14532d]'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => handleThemeChange('green')}
+                  className={`px-2 sm:px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer text-xs ${
+                    isGreen
+                      ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                      : isDark ? 'hover:text-emerald-300 opacity-70 hover:opacity-100' : 'hover:text-emerald-900 opacity-70 hover:opacity-100'
+                  }`}
+                  title="Pastel Mint Green Theme"
+                >
+                  <span>🌿</span> <span className="hidden md:inline">Green</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleThemeChange('sand')}
+                  className={`px-2 sm:px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer text-xs ${
+                    isSand
+                      ? 'bg-[#8c734b] text-white shadow-xs font-bold'
+                      : isDark ? 'hover:text-amber-200 opacity-70 hover:opacity-100' : 'hover:text-[#5c4c36] opacity-70 hover:opacity-100'
+                  }`}
+                  title="Warm Sand Kraft Theme"
+                >
+                  <span>📜</span> <span className="hidden md:inline">Sand</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleThemeChange('dark')}
+                  className={`px-2 sm:px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer text-xs ${
+                    isDark
+                      ? 'bg-[#d4af37] text-slate-900 shadow-xs font-bold'
+                      : 'hover:text-yellow-600 opacity-70 hover:opacity-100'
+                  }`}
+                  title="Obsidian Dark Theme"
+                >
+                  <span>🌙</span> <span className="hidden md:inline">Dark</span>
+                </button>
+              </div>
+
+              <span className={`text-sm hidden md:inline ${
+                isDark ? 'text-slate-300' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
+              }`}>
+                Logged in as <span className={`font-semibold ${
+                  isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-[#14532d]'
+                }`}>{user?.username}</span>
                 {user?.is_admin && (
                   <span className={`ml-1 text-xs px-2 py-0.5 rounded-full font-bold shadow-xs ${
-                    theme === 'dark' ? 'bg-gradient-to-r from-[#d4af37] to-[#aa841e] text-[#0f172a]' : 'bg-gradient-to-r from-[#9f8150] to-[#bfa16f] text-white'
+                    isDark 
+                      ? 'bg-gradient-to-r from-[#d4af37] to-[#aa841e] text-[#0f172a]' 
+                      : isSand
+                        ? 'bg-gradient-to-r from-[#9f8150] to-[#bfa16f] text-white'
+                        : 'bg-gradient-to-r from-[#16a34a] to-[#15803d] text-white'
                   }`}>
                     Admin
                   </span>
@@ -216,8 +282,8 @@ function App() {
               </span>
               <button
                 onClick={handleLogout}
-                className={`font-semibold px-4 py-2 rounded-lg text-sm border transition duration-150 cursor-pointer ${
-                  theme === 'dark'
+                className={`font-semibold px-3 sm:px-4 py-2 rounded-lg text-sm border transition duration-150 cursor-pointer ${
+                  isDark
                     ? 'bg-[#1a2332] border-red-950/40 text-red-400 hover:bg-red-950/20'
                     : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
                 }`}

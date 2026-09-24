@@ -8,6 +8,8 @@ import axios from 'axios';
 function CostDonutChart({ calculatedCost, theme }) {
   const [activeSegment, setActiveSegment] = useState(null);
   const isDark = theme === 'dark';
+  const isSand = theme === 'sand';
+  const isGreen = !isDark && !isSand;
 
   const rmCost = parseFloat(calculatedCost.rates?.rm_cost_per_carton || 0);
   const overhead = parseFloat(calculatedCost.per_carton_costs?.overhead || 0);
@@ -45,9 +47,15 @@ function CostDonutChart({ calculatedCost, theme }) {
 
   return (
     <div className={`flex flex-col items-center p-6 rounded-3xl border shadow-xs w-full transition-colors duration-200 ${
-      isDark ? 'bg-[#1a2332]/60 border-slate-700/60 text-[#e2d4c0]' : 'bg-[#fcfbfa]/80 border-[#e8dfc7] text-[#5c4c36]'
+      isDark 
+        ? 'bg-[#1a2332]/60 border-slate-700/60 text-[#e2d4c0]' 
+        : isSand
+          ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+          : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
     }`}>
-      <h3 className={`text-sm font-bold mb-4 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>🍩 Cost Breakdown (Per Carton)</h3>
+      <h3 className={`text-sm font-bold mb-4 ${
+        isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#15803d]'
+      }`}>🍩 Cost Breakdown (Per Carton)</h3>
       <div className="relative w-44 h-44 flex-shrink-0">
         <svg viewBox="0 0 140 140" className="w-full h-full transform -rotate-90">
           <circle cx="70" cy="70" r="50" fill="transparent" stroke={isDark ? "#334155" : "#f3f4f6"} strokeWidth="15" />
@@ -108,8 +116,8 @@ function CostDonutChart({ calculatedCost, theme }) {
                 hasBreakdown ? 'col-span-1 sm:col-span-2' : ''
               } ${
                 isHovered 
-                  ? (isDark ? 'bg-slate-700/70 border-[#c5a880]/60 shadow-xs' : 'bg-white border-[#8c734b]/50 shadow-xs') 
-                  : (isDark ? 'bg-[#131924]/50 border-slate-700/40 hover:bg-slate-800/70' : 'bg-white/70 border-gray-150 hover:bg-white')
+                  ? (isDark ? 'bg-slate-700/70 border-[#c5a880]/60 shadow-xs' : isSand ? 'bg-white border-[#8c734b]/50 shadow-xs' : 'bg-white border-emerald-500/50 shadow-xs') 
+                  : (isDark ? 'bg-[#131924]/50 border-slate-700/40 hover:bg-slate-800/70' : isSand ? 'bg-white/70 border-[#dfd5bc]/60 hover:bg-white' : 'bg-white/70 border-[#bbf7d0]/60 hover:bg-white')
               }`}
               onMouseEnter={() => {
                 setActiveSegment({ ...segment, percent });
@@ -119,12 +127,16 @@ function CostDonutChart({ calculatedCost, theme }) {
               <div className="flex items-center justify-between gap-1.5 w-full">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-xs" style={{ backgroundColor: segment.color }} />
-                  <span className={`truncate font-medium text-[11px] ${isDark ? 'text-slate-200' : 'text-gray-700'}`}>
+                  <span className={`truncate font-medium text-[11px] ${
+                    isDark ? 'text-slate-200' : isSand ? 'text-[#5c4c36]' : 'text-gray-700'
+                  }`}>
                     {segment.label}
                   </span>
                 </div>
                 <div className="text-right flex-shrink-0 font-mono text-[11px]">
-                  <span className={`font-bold ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+                  <span className={`font-bold ${
+                    isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#15803d]'
+                  }`}>
                     Rs. {segment.value.toFixed(2)}
                   </span>
                 </div>
@@ -139,14 +151,18 @@ function CostDonutChart({ calculatedCost, theme }) {
                       className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition-all ${
                         isDark 
                           ? 'bg-[#0f141e]/70 border-slate-700/60 text-slate-300' 
-                          : 'bg-slate-50 border-gray-200/70 text-gray-700'
+                          : isSand
+                            ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+                            : 'bg-slate-50 border-gray-200/70 text-gray-700'
                       }`}
                     >
                       <span className="truncate flex items-center gap-1 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]/80 flex-shrink-0" />
                         {sub.label}:
                       </span>
-                      <span className={`font-mono font-bold ml-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+                      <span className={`font-mono font-bold ml-1 ${
+                        isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#15803d]'
+                      }`}>
                         Rs. {sub.value.toFixed(2)}
                       </span>
                     </div>
@@ -163,6 +179,8 @@ function CostDonutChart({ calculatedCost, theme }) {
 
 function ReelSlicingDiagram({ calculatedCost, theme }) {
   const isDark = theme === 'dark';
+  const isSand = theme === 'sand';
+  const isGreen = !isDark && !isSand;
   const sheetWidth = parseFloat(calculatedCost.sheet_dimensions?.sheet_width_mm || 0);
   const selectedReel = parseFloat(calculatedCost.reel_information?.selected_reel_mm ?? calculatedCost.sheet_dimensions?.selected_reel_mm ?? 0);
   const sheetsPerReel = parseInt(calculatedCost.reel_information?.sheets_per_reel ?? calculatedCost.sheet_dimensions?.sheets_per_reel ?? 0);
@@ -184,9 +202,15 @@ function ReelSlicingDiagram({ calculatedCost, theme }) {
 
   return (
     <div className={`p-6 rounded-2xl border shadow-xs flex flex-col items-center w-full transition-colors duration-200 ${
-      isDark ? 'bg-slate-800/50 border-slate-700 text-slate-100' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
+      isDark 
+        ? 'bg-slate-800/50 border-slate-700 text-slate-100' 
+        : isSand
+          ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+          : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
     }`}>
-      <h3 className={`text-sm font-bold mb-4 ${isDark ? 'text-blue-400' : 'text-[#166534]'}`}>✂️ Reel Slicing Layout (2D Visual)</h3>
+      <h3 className={`text-sm font-bold mb-4 ${
+        isDark ? 'text-blue-400' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
+      }`}>✂️ Reel Slicing Layout (2D Visual)</h3>
       <div className="w-full max-w-[480px]">
         <svg viewBox="0 0 500 130" className="w-full h-auto">
           <defs>
@@ -396,6 +420,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   });
   const [showInches, setShowInches] = useState(false);
   const isDark = theme === 'dark';
+  const isSand = theme === 'sand';
+  const isGreen = !isDark && !isSand;
 
   // Fetch live system parameters (White Liner rate & Brown Liner rate) from admin parameters
   useEffect(() => {
@@ -851,31 +877,41 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     }
   };
 
-  // Enterprise Shell Styles: White input cells with black letters & light green backgrounds
-  const inputClass = `w-full px-4 py-2.5 border-2 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 shadow-xs text-sm font-medium ${
+  // Enterprise Shell Styles: Supports Green, Sand, and Dark themes
+  const inputClass = `w-full px-4 py-2.5 border-2 rounded-xl transition-all duration-300 focus:outline-none shadow-xs text-sm font-medium ${
     isDark 
-      ? 'bg-[#1a2332]/95 border-[#c5a880]/20 text-[#e2d4c0] placeholder-slate-500 focus:border-[#d4af37]' 
-      : 'bg-white border-emerald-300 text-black placeholder-gray-400 hover:border-emerald-400 focus:border-emerald-600'
+      ? 'bg-[#1a2332]/95 border-[#c5a880]/20 text-[#e2d4c0] placeholder-slate-500 focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/30' 
+      : isSand
+        ? 'bg-white border-[#dfd5bc] text-[#5c4c36] placeholder-[#b8b09b] hover:border-[#8c734b] focus:border-[#8c734b] focus:ring-2 focus:ring-[#8c734b]/20'
+        : 'bg-white border-emerald-300 text-black placeholder-gray-400 hover:border-emerald-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/30'
   }`;
 
-  const selectClass = `w-full px-4 py-2.5 border-2 rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 shadow-xs cursor-pointer text-sm font-medium ${
+  const selectClass = `w-full px-4 py-2.5 border-2 rounded-xl transition-all duration-300 focus:outline-none shadow-xs cursor-pointer text-sm font-medium ${
     isDark 
-      ? 'bg-[#1a2332]/95 border-[#c5a880]/20 text-[#e2d4c0] focus:border-[#d4af37]' 
-      : 'bg-white border-emerald-300 text-black hover:border-emerald-400 focus:border-emerald-600'
+      ? 'bg-[#1a2332]/95 border-[#c5a880]/20 text-[#e2d4c0] focus:border-[#d4af37] focus:ring-2 focus:ring-[#d4af37]/30' 
+      : isSand
+        ? 'bg-white border-[#dfd5bc] text-[#5c4c36] hover:border-[#8c734b] focus:border-[#8c734b] focus:ring-2 focus:ring-[#8c734b]/20'
+        : 'bg-white border-emerald-300 text-black hover:border-emerald-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/30'
   }`;
 
   const cardClass = `p-8 rounded-3xl border transition-all duration-300 shadow-lg ${
     isDark 
       ? 'bg-[#131924]/85 border-[#c5a880]/15 text-slate-100 shadow-[#000000]/40' 
-      : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d] shadow-emerald-950/5'
+      : isSand
+        ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36] shadow-md'
+        : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d] shadow-emerald-950/5'
   }`;
 
   const labelClass = `block text-xs font-bold uppercase tracking-wider mb-2 ${
-    isDark ? 'text-[#c5a880]' : 'text-[#166534]'
+    isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
   }`;
 
   const headingClass = `text-lg font-bold mb-4 flex items-center gap-2 border-b pb-2 ${
-    isDark ? 'text-[#d4af37] border-slate-700/60' : 'text-[#14532d] border-[#bbf7d0]'
+    isDark 
+      ? 'text-[#d4af37] border-slate-700/60' 
+      : isSand
+        ? 'text-[#8c734b] border-[#e8dfc7]'
+        : 'text-[#14532d] border-[#bbf7d0]'
   }`;
 
   // Ensure effective final cost per carton and invoice value consistently reflect Non-VAT (no added output tax)
@@ -891,7 +927,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
   return (
     <div className={`rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-left border ${
-      isDark ? 'bg-[#0f141e]/90 text-white border-[#c5a880]/20 shadow-black/50' : 'bg-[#f4faf4] text-[#14532d] border-[#bbf7d0] shadow-xl'
+      isDark 
+        ? 'bg-[#0f141e]/90 text-white border-[#c5a880]/20 shadow-black/50' 
+        : isSand
+          ? 'bg-[#fcfaf7] text-[#5c4c36] border-[#dfd5bc] shadow-xl'
+          : 'bg-[#f4faf4] text-[#14532d] border-[#bbf7d0] shadow-xl'
     }`}>
       <div className="flex flex-wrap justify-between items-center mb-6 gap-2">
         <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -902,10 +942,14 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             formData.isEditing
               ? isDark 
                 ? 'bg-amber-950/60 text-[#d4af37] border-[#d4af37]/40' 
-                : 'bg-amber-100/80 text-[#8c734b] border-[#8c734b]/40'
+                : isSand
+                  ? 'bg-[#f5ebd7] text-[#8c734b] border-[#8c734b]/40'
+                  : 'bg-amber-100/80 text-[#8c734b] border-[#8c734b]/40'
               : isDark 
                 ? 'bg-[#1a2332] text-[#d4af37] border-[#c5a880]/30' 
-                : 'bg-[#eaf5ea] text-[#166534] border-[#bbf7d0]'
+                : isSand
+                  ? 'bg-[#faf8f5] text-[#8c734b] border-[#dfd5bc]'
+                  : 'bg-[#eaf5ea] text-[#166534] border-[#bbf7d0]'
           }`}>
             {formData.isEditing ? `✏️ Editing: ${formData.quoteNo}` : `📋 Next Quote: ${nextQuoteNo}`}
           </span>
@@ -954,7 +998,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         {/* DIE SIZE INPUTS (shown when carton type is not RSC: Lock Type, Mail Type, Special Shape, S.F.) */}
         {formData.cartonType && formData.cartonType !== 'RSC' && (
           <div className={`p-4 rounded-2xl mb-4 border transition-all duration-200 ${
-            isDark ? 'bg-purple-950/20 border-purple-800/40 text-purple-200' : 'bg-[#e2f0d9] border-[#bbf7d0] text-[#14532d]'
+            isDark 
+              ? 'bg-purple-950/20 border-purple-800/40 text-purple-200' 
+              : isSand
+                ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+                : 'bg-[#e2f0d9] border-[#bbf7d0] text-[#14532d]'
           }`}>
             <p className="text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <span>✂️</span> Die Size (mm) — Direct Board Size
@@ -997,8 +1045,16 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             onClick={() => setShowInches(!showInches)}
             className={`text-xs px-3 py-1 rounded-xl border font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
               showInches
-                ? 'bg-emerald-700 text-white border-emerald-800 shadow-emerald-600/20'
-                : 'bg-white hover:bg-gray-100 text-[#14532d] dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border-[#bbf7d0] dark:border-slate-700'
+                ? isDark 
+                  ? 'bg-[#d4af37] text-[#0f172a] border-[#d4af37]' 
+                  : isSand
+                    ? 'bg-[#8c734b] text-white border-[#8c734b]'
+                    : 'bg-emerald-700 text-white border-emerald-800 shadow-emerald-600/20'
+                : isDark 
+                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700' 
+                  : isSand
+                    ? 'bg-white hover:bg-[#faf8f5] text-[#5c4c36] border-[#dfd5bc]'
+                    : 'bg-white hover:bg-emerald-50 text-[#14532d] border-[#bbf7d0]'
             }`}
           >
             <span>📐</span> {showInches ? '✓ Inches Input Active' : '📐 Select Inches Input (Auto × 25.4 → mm)'}
@@ -1008,10 +1064,16 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         {/* 3 Square Slots for Inches Input */}
         {showInches && (
           <div className={`p-4 mb-4 rounded-2xl border transition-all ${
-            isDark ? 'bg-slate-800/70 border-blue-900/40 text-slate-200' : 'bg-[#e2f0d9] border-[#bbf7d0] text-[#14532d]'
+            isDark 
+              ? 'bg-slate-800/70 border-blue-900/40 text-slate-200' 
+              : isSand
+                ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+                : 'bg-[#e2f0d9] border-[#bbf7d0] text-[#14532d]'
           }`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-black tracking-wide flex items-center gap-1 text-[#166534] dark:text-blue-400">
+              <span className={`text-xs font-black tracking-wide flex items-center gap-1 ${
+                isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
+              }`}>
                 <span>📏</span> 3 SQUARE SLOTS: INCHES INPUT (auto-calculated as figure × 25.4 and filled to mm slots):
               </span>
             </div>
@@ -1088,7 +1150,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
         {currentBoardArea > 0 && (
           <div className={`mt-5 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border shadow-xs transition-all ${
-            isDark ? 'bg-[#131924]/80 border-[#c5a880]/20' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
+            isDark 
+              ? 'bg-[#131924]/80 border-[#c5a880]/20 text-[#e2d4c0]' 
+              : isSand
+                ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+                : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
           }`}>
             <div className="flex items-center gap-2.5">
               <span className="text-xl">📦</span>
@@ -1423,7 +1489,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Inhouse Commission */}
-          <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-700/30 border-slate-700' : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'}`}>
+          <div className={`p-4 rounded-xl border ${
+            isDark 
+              ? 'bg-slate-700/30 border-slate-700 text-slate-200' 
+              : isSand
+                ? 'bg-white border-[#dfd5bc] text-[#5c4c36]'
+                : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'
+          }`}>
             <span className={labelClass}>Inhouse Sales Commission?</span>
             <div className="flex gap-4 text-sm mt-1">
               <label className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -1455,7 +1527,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           </div>
 
           {/* 3rd Party Commission */}
-          <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-700/30 border-slate-700' : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'}`}>
+          <div className={`p-4 rounded-xl border ${
+            isDark 
+              ? 'bg-slate-700/30 border-slate-700 text-slate-200' 
+              : isSand
+                ? 'bg-white border-[#dfd5bc] text-[#5c4c36]'
+                : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'
+          }`}>
             <span className={labelClass}>3rd Party Sales Commission?</span>
             <div className="flex gap-4 mb-3 text-sm mt-1">
               <label className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -1497,7 +1575,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       {/* SECTION 7: DELIVERY */}
       <div className={`${cardClass} mb-6`}>
         <h3 className={headingClass}>🚚 Transport Cost</h3>
-        <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-700/30 border-slate-700' : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'}`}>
+        <div className={`p-4 rounded-xl border ${
+          isDark 
+            ? 'bg-slate-700/30 border-slate-700 text-slate-200' 
+            : isSand
+              ? 'bg-white border-[#dfd5bc] text-[#5c4c36]'
+              : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'
+        }`}>
           <span className={labelClass}>Is there any transport cost?</span>
           <div className="flex gap-4 mb-3 text-sm mt-1">
             <label className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -1553,17 +1637,25 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         onClick={calculateCost}
         disabled={loading}
         style={{
-          backgroundColor: isDark ? '#d4af37' : '#15803d',
+          backgroundColor: isDark ? '#d4af37' : isSand ? '#8c734b' : '#15803d',
           color: isDark ? '#0f172a' : '#ffffff',
           display: 'block',
           width: '100%',
           visibility: 'visible',
           opacity: loading ? 0.6 : 1
         }}
-        className={`w-full ${isDark ? 'bg-[#d4af37] text-[#0f172a]' : 'bg-[#15803d] text-white'} bg-gradient-to-r ${
+        className={`w-full ${
+          isDark 
+            ? 'bg-[#d4af37] text-[#0f172a]' 
+            : isSand 
+              ? 'bg-[#8c734b] text-white' 
+              : 'bg-[#15803d] text-white'
+        } bg-gradient-to-r ${
           isDark 
             ? 'from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
-            : 'from-[#16a34a] to-[#15803d] hover:from-[#22c55e] hover:to-[#16a34a]'
+            : isSand
+              ? 'from-[#8c734b] to-[#5c4c36] hover:from-[#a08457] hover:to-[#6d5a40]'
+              : 'from-[#16a34a] to-[#15803d] hover:from-[#22c55e] hover:to-[#16a34a]'
         } font-bold py-4 rounded-2xl transition duration-150 cursor-pointer shadow-lg text-sm uppercase tracking-wider mt-4`}
       >
         {loading ? '🔄 Calculating...' : '✨ Calculate Cost'}
@@ -1572,9 +1664,15 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       {/* RESULTS DISPLAY PANEL */}
       {calculatedCost && (
         <div className={`mt-10 border rounded-3xl p-8 transition-all duration-300 ${
-          isDark ? 'bg-[#0f141e]/90 border-[#c5a880]/20 shadow-black/50' : 'bg-[#f4faf4] border-[#bbf7d0] shadow-xl'
+          isDark 
+            ? 'bg-[#0f141e]/90 border-[#c5a880]/20 shadow-black/50' 
+            : isSand
+              ? 'bg-[#fcfaf7] border-[#dfd5bc] shadow-xl'
+              : 'bg-[#f4faf4] border-[#bbf7d0] shadow-xl'
         }`}>
-          <h2 className={`text-2xl font-bold mb-6 flex items-center gap-2 ${isDark ? 'text-[#d4af37]' : 'text-[#14532d]'}`}>
+          <h2 className={`text-2xl font-bold mb-6 flex items-center gap-2 ${
+            isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#14532d]'
+          }`}>
             <span>📊</span> Costing Results
           </h2>
 
@@ -1582,11 +1680,17 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             {/* Left Panel: Specifications List */}
             <div className={`p-6 rounded-3xl border shadow-xs flex flex-col justify-between ${
-              isDark ? 'bg-[#1a2332]/60 border-slate-700/60 text-[#e2d4c0]' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
+              isDark 
+                ? 'bg-[#1a2332]/60 border-slate-700/60 text-[#e2d4c0]' 
+                : isSand
+                  ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+                  : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
             }`}>
               <div>
-                <h3 className={`text-sm font-bold mb-4 ${isDark ? 'text-[#d4af37]' : 'text-[#166534]'}`}>📐 Product Specifications</h3>
-                <div className={`space-y-3 text-sm text-left ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+                <h3 className={`text-sm font-bold mb-4 ${
+                  isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
+                }`}>📐 Product Specifications</h3>
+                <div className={`space-y-3 text-sm text-left ${isDark ? 'text-slate-300' : isSand ? 'text-[#5c4c36]' : 'text-gray-600'}`}>
                   <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
                     <span className="font-semibold">Sheet Size:</span>
                     <span>{calculatedCost.sheet_dimensions.sheet_length_mm} × {calculatedCost.sheet_dimensions.sheet_width_mm} mm</span>
@@ -1631,40 +1735,64 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           {/* Financial Summary Grid with Increased Bottom Row Letter Size */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <div className={`p-5 rounded-3xl border text-center shadow-md transition ${
-              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
+              isDark 
+                ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' 
+                : isSand
+                  ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+                  : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
             }`}>
-              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#166534]'}`}>Invoice Value</p>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${
+                isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
+              }`}>Invoice Value</p>
               <p className="text-2xl sm:text-3xl font-black">
                 Rs. {totalInvoiceValue.toFixed(2)}{!isNonVatCustomer ? ' + VAT' : ''}
               </p>
               {/* Bottom row: letter size increased for better visual effect */}
-              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>
+              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${
+                isDark ? 'text-slate-200' : isSand ? 'text-[#5c4c36]' : 'text-gray-900'
+              }`}>
                 Rs. {finalCostPerCarton.toFixed(2)}{!isNonVatCustomer ? ' + VAT' : ''} × {quantityNum}
               </p>
             </div>
             
             <div className={`p-5 rounded-3xl border text-center shadow-md transition ${
-              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
+              isDark 
+                ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' 
+                : isSand
+                  ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+                  : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
             }`}>
-              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#166534]'}`}>Total RM Cost</p>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${
+                isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
+              }`}>Total RM Cost</p>
               <p className="text-2xl sm:text-3xl font-black">
                 Rs. {(calculatedCost.rates.rm_cost_per_carton * quantityNum).toFixed(2)}
               </p>
               {/* Bottom row: letter size increased for better visual effect */}
-              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>
+              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${
+                isDark ? 'text-slate-200' : isSand ? 'text-[#5c4c36]' : 'text-gray-900'
+              }`}>
                 Rs. {calculatedCost.rates.rm_cost_per_carton} × {quantityNum}
               </p>
             </div>
             
             <div className={`p-5 rounded-3xl border text-center shadow-md transition ${
-              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
+              isDark 
+                ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' 
+                : isSand
+                  ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+                  : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
             }`}>
-              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#166534]'}`}>Net Profit</p>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${
+                isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
+              }`}>Net Profit</p>
               <p className="text-2xl sm:text-3xl font-black">
                 Rs. {(calculatedCost.profit.profit_amount * quantityNum).toFixed(2)}
               </p>
               {/* Bottom row: letter size increased for better visual effect */}
-              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>
+              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${
+                isDark ? 'text-slate-200' : isSand ? 'text-[#5c4c36]' : 'text-gray-900'
+              }`}>
                 Rs. {calculatedCost.profit.profit_amount} × {quantityNum}
               </p>
             </div>
@@ -1674,7 +1802,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <div className={`rounded-3xl p-6 flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl border transition-all duration-300 ${
             isDark 
               ? 'bg-gradient-to-r from-[#1a2332] to-[#131924] border-[#c5a880]/30 text-[#e2d4c0] shadow-black/50' 
-              : 'bg-gradient-to-r from-[#166534] to-[#14532d] border-[#86efac] text-white'
+              : isSand
+                ? 'bg-gradient-to-r from-[#8c734b] to-[#5c4c36] border-[#dfd5bc] text-white shadow-xl'
+                : 'bg-gradient-to-r from-[#166534] to-[#14532d] border-[#86efac] text-white shadow-xl'
           }`}>
             <div>
               <p className="text-sm opacity-90">Final Cost Per Carton</p>
@@ -1691,14 +1821,16 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               onClick={saveQuote}
               style={{
                 backgroundColor: isDark ? '#d4af37' : '#ffffff',
-                color: isDark ? '#0f172a' : '#14532d',
+                color: isDark ? '#0f172a' : isSand ? '#5c4c36' : '#14532d',
                 visibility: 'visible',
                 display: 'inline-block'
               }}
               className={`font-black py-3 px-8 rounded-2xl shadow-lg transition duration-150 cursor-pointer hover:scale-[1.03] active:scale-[0.97] ${
                 isDark 
                   ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
-                  : 'bg-white hover:bg-[#faf8f5] text-[#14532d]'
+                  : isSand
+                    ? 'bg-white hover:bg-[#faf8f5] text-[#5c4c36]'
+                    : 'bg-white hover:bg-[#faf8f5] text-[#14532d]'
               }`}
             >
               💾 Save Quote

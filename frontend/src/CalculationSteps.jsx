@@ -1,15 +1,23 @@
 import React from 'react';
 
 export default function CalculationSteps({ formData, calculatedCost, theme }) {
+  const isDark = theme === 'dark';
+  const isSand = theme === 'sand';
+  const isGreen = !isDark && !isSand;
+
   if (!calculatedCost) {
     return (
-      <div className={`rounded-2xl shadow-xl p-8 text-center ${
-        theme === 'dark' ? 'bg-slate-800 text-white' : 'bg-white text-gray-800'
+      <div className={`rounded-2xl shadow-xl p-8 text-center border ${
+        isDark 
+          ? 'bg-slate-800 text-white border-slate-700' 
+          : isSand
+            ? 'bg-[#faf8f5] text-[#5c4c36] border-[#dfd5bc]'
+            : 'bg-[#eaf5ea] text-[#14532d] border-[#bbf7d0]'
       }`}>
         <h2 className="text-2xl font-bold mb-4">🧮 Calculation Logic & Steps</h2>
         <div className="max-w-md mx-auto py-8">
           <span className="text-5xl">💡</span>
-          <p className="text-gray-500 dark:text-slate-400 mt-4 font-medium">
+          <p className={`mt-4 font-medium ${isDark ? 'text-slate-400' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
             Please perform a calculation in the <strong>Calculator</strong> tab first. 
             Once calculated, this tab will show a live step-by-step solver substituting your inputs into all the equations.
           </p>
@@ -17,8 +25,6 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
       </div>
     );
   }
-
-  const isDark = theme === 'dark';
 
   // Helper variables for equations
   const L = parseFloat(formData.cartonLength || 0);
@@ -119,23 +125,39 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
 
   // Modern Shell CSS Variables
   const cardClass = `p-6 rounded-2xl border transition-all duration-200 ${
-    isDark ? 'bg-slate-800/40 border-slate-700 text-white' : 'bg-slate-50/40 border-gray-150 text-gray-800'
+    isDark 
+      ? 'bg-slate-800/40 border-slate-700 text-white' 
+      : isSand
+        ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+        : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
   }`;
 
   const solveBoxClass = `p-4 rounded-xl border text-sm mt-1.5 font-mono ${
-    isDark ? 'bg-slate-900/60 border-slate-700 text-slate-100' : 'bg-white border-gray-100 text-gray-600'
+    isDark 
+      ? 'bg-slate-900/60 border-slate-700 text-slate-100' 
+      : isSand
+        ? 'bg-white border-[#dfd5bc] text-[#5c4c36]'
+        : 'bg-white border-[#bbf7d0] text-[#14532d]'
   }`;
 
   const phaseHeaderClass = `text-md font-bold uppercase tracking-wider mb-4 ${
-    isDark ? 'text-blue-400' : 'text-blue-900'
+    isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#15803d]'
   }`;
 
   return (
-    <div className={`rounded-2xl shadow-xl p-8 max-w-4xl mx-auto transition-colors duration-200 text-left ${
-      isDark ? 'bg-slate-800 text-white border border-slate-700' : 'bg-white text-gray-800'
+    <div className={`rounded-2xl shadow-xl p-8 max-w-4xl mx-auto transition-colors duration-200 text-left border ${
+      isDark 
+        ? 'bg-slate-800 text-white border-slate-700' 
+        : isSand
+          ? 'bg-[#fcfaf7] text-[#5c4c36] border-[#dfd5bc]'
+          : 'bg-[#f4faf4] text-[#14532d] border-[#bbf7d0]'
     }`}>
       <h2 className={`text-2xl font-bold mb-6 border-b pb-4 flex items-center gap-2 ${
-        isDark ? 'border-slate-700' : 'border-gray-100'
+        isDark 
+          ? 'border-slate-700 text-[#d4af37]' 
+          : isSand
+            ? 'border-[#dfd5bc] text-[#8c734b]'
+            : 'border-[#bbf7d0] text-[#14532d]'
       }`}>
         <span>🧮</span> Live Costing Step-by-Step Solver
       </h2>

@@ -20,6 +20,8 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
   const [heightFilter, setHeightFilter] = useState('');
 
   const isDark = theme === 'dark';
+  const isSand = theme === 'sand';
+  const isGreen = !isDark && !isSand;
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -227,30 +229,40 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
     return true;
   });
 
-  // Luxurious Enterprise Type Shell Styles
-  const inputClass = `px-3.5 py-1.5 border rounded-xl text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#c5a880]/40 focus:border-[#d4af37] ${
+  // Enterprise Shell Styles: Supports Green, Sand, and Dark
+  const inputClass = `px-3.5 py-1.5 border rounded-xl text-sm transition-all focus:outline-none focus:ring-2 ${
     isDark 
-      ? 'bg-[#1a2332] border-[#c5a880]/20 text-[#e2d4c0] placeholder-slate-500' 
-      : 'bg-[#fcfbfa] border-[#dfd5bc] text-[#5c4c36] placeholder-[#b8b09b]'
+      ? 'bg-[#1a2332] border-[#c5a880]/20 text-[#e2d4c0] placeholder-slate-500 focus:ring-[#c5a880]/40 focus:border-[#d4af37]' 
+      : isSand
+        ? 'bg-white border-[#dfd5bc] text-[#5c4c36] placeholder-[#b8b09b] focus:ring-[#8c734b]/20 focus:border-[#8c734b]'
+        : 'bg-white border-emerald-300 text-black placeholder-gray-400 focus:ring-emerald-500/20 focus:border-emerald-600'
   }`;
 
   return (
     <div className={`rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-left relative border ${
-      isDark ? 'bg-[#0f141e]/90 text-white border-[#c5a880]/20 shadow-black/50' : 'bg-[#fcfaf7] text-[#5c4c36] border-[#e8dfc7] shadow-xl'
+      isDark 
+        ? 'bg-[#0f141e]/90 text-white border-[#c5a880]/20 shadow-black/50' 
+        : isSand
+          ? 'bg-[#fcfaf7] text-[#5c4c36] border-[#dfd5bc] shadow-xl'
+          : 'bg-[#f4faf4] text-[#14532d] border-[#bbf7d0] shadow-xl'
     }`}>
       {/* Loading Overlay */}
       {actionLoading && (
         <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl ${
           isDark ? 'bg-[#0c0f17]/80 backdrop-blur-xs' : 'bg-[#faf8f5]/80 backdrop-blur-xs'
         }`}>
-          <p className={`font-semibold animate-pulse text-lg ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Syncing costing workspace...</p>
+          <p className={`font-semibold animate-pulse text-lg ${
+            isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#15803d]'
+          }`}>Syncing costing workspace...</p>
         </div>
       )}
 
       {/* Main Quote History Table & Controls (hidden in print mode so it occupies 0 height) */}
       <div className="quote-history-main-content">
         <div className="flex justify-between items-center mb-6">
-          <h2 className={`text-2xl font-bold flex items-center gap-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+          <h2 className={`text-2xl font-bold flex items-center gap-2 ${
+            isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#15803d]'
+          }`}>
             <span>📜</span> Quote History
           </h2>
         <button
@@ -258,7 +270,9 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
           className={`font-semibold px-4 py-2 rounded-lg transition text-sm cursor-pointer shadow-xs border ${
             isDark 
               ? 'bg-[#1a2332] border-[#c5a880]/25 text-[#d4af37] hover:bg-slate-700' 
-              : 'bg-[#faf8f5] border-[#dfd5bc] text-[#8c734b] hover:bg-[#eae5d9]/40'
+              : isSand
+                ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#8c734b] hover:bg-[#eae5d9]/40'
+                : 'bg-white border-[#bbf7d0] text-[#15803d] hover:bg-emerald-50'
           }`}
         >
           🔄 Refresh
@@ -275,9 +289,15 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
 
       {/* FILTER CONTROLS */}
       <div className={`p-5 rounded-3xl border mb-6 ${
-        isDark ? 'bg-[#131924]/90 border-[#c5a880]/15' : 'bg-[#faf8f5]/90 border-[#dfd5bc]'
+        isDark 
+          ? 'bg-[#131924]/90 border-[#c5a880]/15' 
+          : isSand
+            ? 'bg-[#faf8f5]/90 border-[#dfd5bc]'
+            : 'bg-[#eaf5ea]/90 border-[#bbf7d0]'
       }`}>
-        <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>🔍 Filter & Search History</h4>
+        <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${
+          isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
+        }`}>🔍 Filter & Search History</h4>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5">
           <input
             type="text"
@@ -347,60 +367,84 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
           No quotes match your filters.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border dark:border-[#c5a880]/20">
-          <table className="min-w-full divide-y dark:divide-[#c5a880]/20 divide-[#dfd5bc]">
-            <thead className={isDark ? 'bg-[#131924]/80' : 'bg-[#eae5d9]/30'}>
+        <div className={`overflow-x-auto rounded-2xl border ${
+          isDark ? 'border-[#c5a880]/20' : isSand ? 'border-[#dfd5bc]' : 'border-[#bbf7d0]'
+        }`}>
+          <table className={`min-w-full divide-y ${
+            isDark ? 'divide-[#c5a880]/20' : isSand ? 'divide-[#dfd5bc]' : 'divide-[#bbf7d0]'
+          }`}>
+            <thead className={isDark ? 'bg-[#131924]/80' : isSand ? 'bg-[#eae5d9]/30' : 'bg-[#eaf5ea]'}>
               <tr>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
+                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                   Order No.
                 </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
+                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                   Customer
                 </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
+                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                   Dimensions (L×W×H mm)
                 </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
+                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                   Ply / Qty
                 </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
+                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                   Per Carton / Total
                 </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
+                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                   Date
                 </th>
-                <th className={`px-6 py-3 text-right text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
+                <th className={`px-6 py-3 text-right text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className={`divide-y text-sm ${isDark ? 'bg-[#131924]/40 divide-[#c5a880]/15' : 'bg-white divide-[#dfd5bc]'}`}>
+            <tbody className={`divide-y text-sm ${
+              isDark ? 'bg-[#131924]/40 divide-[#c5a880]/15' : isSand ? 'bg-white divide-[#dfd5bc]' : 'bg-white divide-[#bbf7d0]'
+            }`}>
               {filteredQuotes.map((quote) => (
                 <tr
                   key={quote.id}
                   onClick={() => handleRowClick(quote.id)}
-                  className={`transition cursor-pointer ${isDark ? 'hover:bg-[#1a2332]/60' : 'hover:bg-[#faf8f5]'}`}
+                  className={`transition cursor-pointer ${
+                    isDark ? 'hover:bg-[#1a2332]/60' : isSand ? 'hover:bg-[#faf8f5]' : 'hover:bg-[#eaf5ea]/50'
+                  }`}
                 >
                   <td className="px-6 py-4 whitespace-nowrap font-bold">
                     <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${
-                      isDark ? 'bg-[#d4af37]/25 text-[#d4af37]' : 'bg-[#9f8150]/15 text-[#8c734b]'
+                      isDark 
+                        ? 'bg-[#d4af37]/25 text-[#d4af37]' 
+                        : isSand
+                          ? 'bg-[#9f8150]/15 text-[#8c734b]'
+                          : 'bg-emerald-100 text-emerald-800'
                     }`}>
                       {quote.quote_no || `QT-${String(quote.id).padStart(5, '0')}`}
                     </span>
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap font-medium ${isDark ? 'text-white' : 'text-[#5c4c36]'}`}>
+                  <td className={`px-6 py-4 whitespace-nowrap font-medium ${
+                    isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-[#14532d]'
+                  }`}>
                     {quote.customer_name}
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap font-mono text-sm ${isDark ? 'text-slate-300' : 'text-[#6b5940]'}`}>
+                  <td className={`px-6 py-4 whitespace-nowrap font-mono text-sm ${
+                    isDark ? 'text-slate-300' : isSand ? 'text-[#6b5940]' : 'text-gray-700'
+                  }`}>
                     {quote.dimensions}
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-[#6b5940]'}`}>
-                    {quote.ply_type} / <span className={`font-semibold ${isDark ? 'text-white' : 'text-[#5c4c36]'}`}>{quote.quantity}</span>
+                  <td className={`px-6 py-4 whitespace-nowrap ${
+                    isDark ? 'text-slate-300' : isSand ? 'text-[#6b5940]' : 'text-gray-700'
+                  }`}>
+                    {quote.ply_type} / <span className={`font-semibold ${
+                      isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-[#14532d]'
+                    }`}>{quote.quantity}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap font-semibold">
-                    Rs. {quote.final_cost_per_carton}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''} / <span className={isDark ? "text-[#d4af37]" : "text-[#8c734b]"}>Rs. {quote.total_cost_batch}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
+                    Rs. {quote.final_cost_per_carton}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''} / <span className={
+                      isDark ? "text-[#d4af37]" : isSand ? "text-[#8c734b]" : "text-[#15803d]"
+                    }>Rs. {quote.total_cost_batch}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-xs ${isDark ? 'text-slate-400' : 'text-[#8c734b]/80'}`}>
+                  <td className={`px-6 py-4 whitespace-nowrap text-xs ${
+                    isDark ? 'text-slate-400' : isSand ? 'text-[#8c734b]/80' : 'text-[#166534]/80'
+                  }`}>
                     {new Date(quote.created_at).toLocaleDateString()}{' '}
                     {new Date(quote.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </td>
