@@ -249,14 +249,15 @@ class CostingCalculator:
             proposed_print_cost = 0.00
 
         # (3) Slotting cost:
-        # If 2 ply / 3 ply: 1.75
-        # If 5 ply: 2.50
-        if self.params.ply_type in ["2-Ply", "3-Ply"]:
-            proposed_slotting_cost = 1.75
-        elif self.params.ply_type == "5-Ply":
-            proposed_slotting_cost = 2.50
+        # Only add slotting cost for RSC type cartons. If other type, keep as 0.0
+        carton_type = getattr(self.params, 'carton_type', 'RSC')
+        if carton_type == "RSC":
+            if self.params.ply_type in ["2-Ply", "3-Ply"]:
+                proposed_slotting_cost = 1.75
+            else:
+                proposed_slotting_cost = 2.50
         else:
-            proposed_slotting_cost = 2.50
+            proposed_slotting_cost = 0.0
         
         # Rate selection based on board type only
         rate = self._get_rate()
@@ -281,7 +282,7 @@ class CostingCalculator:
             overhead_per_carton = self.params.total_overhead_for_order / self.params.quantity if self.params.quantity > 0 else 0.0
             joining_cost = self.params.joining_cost if (self.params.joining_cost is not None and self.params.joining_cost > 0) else proposed_joining_cost
             print_cost = (self.params.print_cost if (self.params.print_cost is not None and self.params.print_cost > 0) else proposed_print_cost) if self.params.is_printed else 0.0
-            slotting_cost = self.params.slotting_cost if (self.params.slotting_cost is not None and self.params.slotting_cost > 0) else proposed_slotting_cost
+            slotting_cost = (self.params.slotting_cost if (self.params.slotting_cost is not None and self.params.slotting_cost > 0) else proposed_slotting_cost) if carton_type == 'RSC' else 0.0
             bundling_cost = self.params.bundling_cost
             diecutting_cost = self.params.diecutting_cost
             
@@ -346,6 +347,7 @@ class CostingCalculator:
             "sheet_dimensions": {
                 "sheet_length_mm": round(sheet_length, 2),
                 "sheet_width_mm": round(sheet_width, 2),
+                "is_two_up": getattr(self, 'is_two_up', False),
                 "board_area_m2": round(board_area_m2, 4),
                 "selected_reel_mm": selected_reel,
                 "sheets_per_reel": sheets_per_reel,
@@ -422,9 +424,20 @@ class CostingCalculator:
         carton_type = getattr(self.params, 'carton_type', 'RSC')
         die_length = getattr(self.params, 'die_length_mm', 0.0)
         if carton_type != 'RSC' and die_length > 0:
+            self.is_two_up = False
             return float(die_length)
-        formula = SHEET_LENGTH_FORMULAS[self.params.ply_type]
-        return formula(self.params.carton_length_mm, self.params.carton_width_mm)
+        
+        formula = SHEET_LENGTH_FORMULAS.get(self.params.ply_type, lambda L, W: (L + W) * 2 + 62)
+        standard_length = formula(self.params.carton_length_mm, self.params.carton_width_mm)
+        
+        # For RSC type cartons, if calculated sheet length exceeds 1938 mm:
+        # Produced as 2-up method -> length side allowance of 62 mm replaced with 130 mm
+        if carton_type == 'RSC' and standard_length > 1938:
+            self.is_two_up = True
+            return (self.params.carton_length_mm + self.params.carton_width_mm) * 2 + 130
+        
+        self.is_two_up = False
+        return standard_length
     
     def _calculate_sheet_width(self) -> float:
         """Calculate sheet width based on ply type (or die size if not RSC)"""
@@ -516,10 +529,10 @@ class CostingCalculator:
             return self.params.brown_liner_rate
     
     def _calculate_transport_cost(self) -> float:
-        """Calculate transport cost per carton"""
-        if not self.params.has_transport or self.params.quantity <= 0:
+        """Calculate transport cost per carton (entered directly as per-carton cost)"""
+        if not self.params.has_transport:
             return 0.0
-        return self.params.transport_cost / self.params.quantity
+        return float(self.params.transport_cost)
     
     def _calculate_tax(self, cost_with_profit: float, overhead: float) -> Tuple[float, Dict]:
         """Calculate tax based on tax type"""

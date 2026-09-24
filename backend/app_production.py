@@ -561,6 +561,7 @@ def get_quote(quote_id):
             'id': quote.id,
             'quote_no': f"QT-{str(quote.id).zfill(5)}",
             'customer_name': quote.customer_name,
+            'created_at': quote.created_at.strftime('%d/%m/%Y') if quote.created_at else datetime.utcnow().strftime('%d/%m/%Y'),
             'carton_length_mm': quote.carton_length_mm,
             'carton_width_mm': quote.carton_width_mm,
             'carton_height_mm': quote.carton_height_mm,

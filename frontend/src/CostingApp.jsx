@@ -292,14 +292,22 @@ export const calculateBoardAreaAndCategory = (carton) => {
   let sheetLength = 0;
   let sheetWidth = 0;
 
+  let isTwoUp = false;
   if (!isRSC && dieL > 0 && dieW > 0) {
     sheetLength = dieL;
     sheetWidth = dieW;
   } else {
     if (L <= 0 || W <= 0 || H <= 0) {
-      return { boardArea: 0, category: 'S', sheetLength: 0, sheetWidth: 0 };
+      return { boardArea: 0, category: 'S', sheetLength: 0, sheetWidth: 0, isTwoUp: false };
     }
-    sheetLength = (L + W) * 2 + (ply === '2-Ply' || ply === '3-Ply' ? 62 : 75);
+    const stdAllowance = (ply === '2-Ply' || ply === '3-Ply') ? 62 : 75;
+    const standardLength = (L + W) * 2 + stdAllowance;
+    if (isRSC && standardLength > 1938) {
+      sheetLength = (L + W) * 2 + 130;
+      isTwoUp = true;
+    } else {
+      sheetLength = standardLength;
+    }
     const wAdj = (ply === '2-Ply' || ply === '3-Ply') ? 26 : (ply === '5-Ply' ? 32 : 36);
     sheetWidth = (W + H) + wAdj;
   }
@@ -343,7 +351,7 @@ export const calculateBoardAreaAndCategory = (carton) => {
     category = 'L';
   }
 
-  return { boardArea, category, sheetLength, sheetWidth };
+  return { boardArea, category, sheetLength, sheetWidth, isTwoUp };
 };
 
 export const getProposedCosts = (carton, category) => {
@@ -367,8 +375,9 @@ export const getProposedCosts = (carton, category) => {
     else proposedPrint = 6.00;
   }
 
-  // 3. Slotting Cost: 2-Ply / 3-Ply -> 1.75, 5-Ply -> 2.50
-  let proposedSlotting = (carton.plyType === '2-Ply' || carton.plyType === '3-Ply') ? 1.75 : 2.50;
+  // 3. Slotting Cost: RSC only (2-Ply / 3-Ply -> 1.75, 5-Ply / 7-Ply -> 2.50). Other types -> 0.00
+  const isRSC = !carton.cartonType || carton.cartonType === 'RSC';
+  let proposedSlotting = isRSC ? ((carton.plyType === '2-Ply' || carton.plyType === '3-Ply') ? 1.75 : 2.50) : 0.00;
 
   return { proposedJoining, proposedPrint, proposedSlotting };
 };
@@ -385,6 +394,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     whiteLinerRate: '285',
     brownLinerRate: '260',
   });
+  const [showInches, setShowInches] = useState(false);
   const isDark = theme === 'dark';
 
   // Fetch live system parameters (White Liner rate & Brown Liner rate) from admin parameters
@@ -470,7 +480,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   }, [systemRates]);
 
   // Current live category and proposed costs
-  const { boardArea: currentBoardArea, category: currentCategory } = useMemo(() => {
+  const { boardArea: currentBoardArea, category: currentCategory, isTwoUp: currentIsTwoUp } = useMemo(() => {
     return calculateBoardAreaAndCategory(formData);
   }, [
     formData.cartonLength,
@@ -489,6 +499,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     formData.cartonHeight,
     formData.isPrinted,
     formData.plyType,
+    formData.cartonType,
     currentCategory
   ]);
 
@@ -623,6 +634,15 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       }
       if (name === 'joiningType') {
         updated.joiningCostManual = false;
+      }
+      if (name === 'cartonType') {
+        if (value !== 'RSC') {
+          updated.slottingCost = '0';
+          updated.slottingCostManual = true;
+        } else {
+          updated.slottingCost = '';
+          updated.slottingCostManual = false;
+        }
       }
       if (name === 'plyType') {
         updated.slottingCostManual = false;
@@ -760,7 +780,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         total_overhead_for_order: isOutsource ? 0 : parseFloat(formData.totalOverheadForOrder || 0),
         joining_cost: isOutsource ? 0 : parseFloat(formData.joiningCost !== '' && formData.joiningCost !== undefined ? formData.joiningCost : (proposedJoining || 0)),
         print_cost: (!isOutsource && formData.isPrinted) ? parseFloat(formData.printCost !== '' && formData.printCost !== undefined ? formData.printCost : (proposedPrint || 0)) : 0,
-        slotting_cost: isOutsource ? 0 : parseFloat(formData.slottingCost !== '' && formData.slottingCost !== undefined ? formData.slottingCost : (proposedSlotting || 0)),
+        slotting_cost: (isOutsource || formData.cartonType !== 'RSC') ? 0 : parseFloat(formData.slottingCost !== '' && formData.slottingCost !== undefined ? formData.slottingCost : (proposedSlotting || 0)),
         bundling_cost: isOutsource ? 0 : parseFloat(formData.bundlingCost || 0),
         diecutting_cost: isOutsource ? 0 : parseFloat(formData.diecuttingCost || 0),
         profit_margin_percent: parseFloat(formData.profitMargin),
@@ -969,6 +989,82 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           </div>
         )}
         
+        {/* Horizontal Sequential Spaces for L, W, H with Inches Input Selector */}
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-bold opacity-75">Dimensions Input Unit:</label>
+          <button
+            type="button"
+            onClick={() => setShowInches(!showInches)}
+            className={`text-xs px-3 py-1 rounded-xl border font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
+              showInches
+                ? 'bg-blue-600 text-white border-blue-700 shadow-blue-500/20'
+                : 'bg-white hover:bg-gray-100 text-gray-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border-gray-300 dark:border-slate-700'
+            }`}
+          >
+            <span>📐</span> {showInches ? '✓ Inches Input Active' : '📐 Select Inches Input (Auto × 25.4 → mm)'}
+          </button>
+        </div>
+
+        {/* 3 Square Slots for Inches Input */}
+        {showInches && (
+          <div className={`p-4 mb-4 rounded-2xl border transition-all ${
+            isDark ? 'bg-slate-800/70 border-blue-900/40 text-slate-200' : 'bg-blue-50/70 border-blue-200 text-blue-950'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-black tracking-wide flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                <span>📏</span> 3 SQUARE SLOTS: INCHES INPUT (auto-calculated as figure × 25.4 and filled to mm slots):
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Length (inches)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder='e.g. 12"'
+                  value={formData.cartonLength ? (parseFloat(formData.cartonLength) / 25.4).toFixed(2) : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const mm = val !== '' ? (parseFloat(val) * 25.4).toFixed(1) : '';
+                    setFormData(prev => ({ ...prev, cartonLength: mm }));
+                  }}
+                  className={`${inputClass} font-mono font-bold`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Width (inches)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder='e.g. 10"'
+                  value={formData.cartonWidth ? (parseFloat(formData.cartonWidth) / 25.4).toFixed(2) : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const mm = val !== '' ? (parseFloat(val) * 25.4).toFixed(1) : '';
+                    setFormData(prev => ({ ...prev, cartonWidth: mm }));
+                  }}
+                  className={`${inputClass} font-mono font-bold`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Height (inches)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder='e.g. 8"'
+                  value={formData.cartonHeight ? (parseFloat(formData.cartonHeight) / 25.4).toFixed(2) : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const mm = val !== '' ? (parseFloat(val) * 25.4).toFixed(1) : '';
+                    setFormData(prev => ({ ...prev, cartonHeight: mm }));
+                  }}
+                  className={`${inputClass} font-mono font-bold`}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Horizontal Sequential Spaces for L, W, H */}
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div>
@@ -1011,6 +1107,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
                   <span className="text-xs font-mono font-bold opacity-90">
                     {currentBoardArea.toFixed(4)} m²
                   </span>
+                  {currentIsTwoUp && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black tracking-wide border shadow-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 animate-pulse">
+                      ⚠️ 2-Up Method (Length &gt; 1938 mm → 130mm Allowance)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1245,20 +1346,21 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
                 <div className="flex justify-between items-center mb-1">
                   <label className={labelClass}>Slotting (Rs./carton)</label>
                   <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
-                    Auto: Rs. {proposedSlotting.toFixed(2)}
+                    {formData.cartonType !== 'RSC' ? 'N/A (RSC Only)' : `Auto: Rs. ${proposedSlotting.toFixed(2)}`}
                   </span>
                 </div>
                 <div className="relative">
                   <input
                     type="number"
                     name="slottingCost"
-                    placeholder="Slotting"
-                    value={formData.slottingCost}
+                    placeholder={formData.cartonType !== 'RSC' ? '0.00 (RSC Only)' : 'Slotting'}
+                    value={formData.cartonType !== 'RSC' ? '0' : formData.slottingCost}
                     onChange={handleInputChange}
-                    className={inputClass}
+                    disabled={formData.cartonType !== 'RSC'}
+                    className={`${inputClass} ${formData.cartonType !== 'RSC' ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
                     step="0.01"
                   />
-                  {formData.slottingCostManual && (
+                  {formData.cartonType === 'RSC' && formData.slottingCostManual && (
                     <button
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, slottingCostManual: false, slottingCost: proposedSlotting.toFixed(2) }))}
@@ -1420,19 +1522,27 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             </label>
           </div>
           
+          <div className="flex justify-between items-center mb-1">
+            <label className={labelClass}>Transport Cost (Rs./carton)</label>
+            {formData.hasTransport && formData.transportCost && (
+              <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
+                Total for Order: Rs. {(parseFloat(formData.transportCost || 0) * (parseInt(formData.quantity) || 1)).toFixed(2)}
+              </span>
+            )}
+          </div>
           <input
             type="number"
             name="transportCost"
-            placeholder="Enter Total Transport Cost for Order (Rs.)"
+            placeholder="Enter Transport Cost (Rs./carton)"
             value={formData.transportCost}
             onChange={handleInputChange}
             disabled={!formData.hasTransport}
             className={`${inputClass} ${!formData.hasTransport ? 'opacity-40 cursor-not-allowed' : ''}`}
             step="0.01"
           />
-          {formData.hasTransport && calculatedCost?.transport?.transport_per_carton !== undefined && (
+          {formData.hasTransport && formData.transportCost && (
             <p className="text-xs text-blue-500 mt-2 font-bold font-mono">
-              Calculated Transport: Rs. {calculatedCost.transport.transport_per_carton} / carton (Total: Rs. {formData.transportCost} / Qty {formData.quantity})
+              Transport Cost: Rs. {parseFloat(formData.transportCost || 0).toFixed(2)} / carton (Total for Order: Rs. {(parseFloat(formData.transportCost || 0) * (parseInt(formData.quantity) || 1)).toFixed(2)})
             </p>
           )}
         </div>

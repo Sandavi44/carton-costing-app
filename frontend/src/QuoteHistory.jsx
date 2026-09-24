@@ -9,6 +9,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
   // Modals / Action States
   const [actionPromptQuote, setActionPromptQuote] = useState(null);
   const [selectedQuote, setSelectedQuote] = useState(null);
+  const [reportTaxFormat, setReportTaxFormat] = useState('auto');
   const [actionLoading, setActionLoading] = useState(false);
 
   // Filter States
@@ -493,170 +494,324 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         </div>
       )}
 
-      {/* DETAIL MODAL */}
-      {selectedQuote && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
-          <div className={`rounded-3xl shadow-2xl max-w-lg w-full p-5 sm:p-6 relative border flex flex-col max-h-[90vh] ${
-            isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30 shadow-black/50' : 'bg-[#fcfaf7] text-[#2d2417] border-[#dfd5bc]'
-          }`}>
-            {/* Header (fixed at top of modal) */}
-            <div className={`flex items-center justify-between border-b-2 pb-2.5 mb-3 shrink-0 ${
-              isDark ? 'border-[#c5a880]/30' : 'border-[#5c4c36]/30'
+      {/* DETAIL MODAL - OFFICIAL QUOTATION REPORT */}
+      {selectedQuote && (() => {
+        const isVatCustomer = reportTaxFormat === 'vat' || 
+          (reportTaxFormat === 'auto' && (!selectedQuote.tax_type || !selectedQuote.tax_type.includes('Non-VAT')));
+
+        const unitPrice = parseFloat(selectedQuote.final_cost_per_carton || 0);
+        const qty = parseInt(selectedQuote.quantity || 0, 10);
+        const subtotalAmount = unitPrice * qty;
+        const vatAmount = subtotalAmount * 0.18;
+        const totalAmount = isVatCustomer ? (subtotalAmount + vatAmount) : subtotalAmount;
+
+        const displayDate = (() => {
+          if (!selectedQuote?.created_at) return new Date().toLocaleDateString('en-GB');
+          if (typeof selectedQuote.created_at === 'string' && selectedQuote.created_at.includes('/')) {
+            return selectedQuote.created_at;
+          }
+          try {
+            return new Date(selectedQuote.created_at).toLocaleDateString('en-GB');
+          } catch (e) {
+            return String(selectedQuote.created_at);
+          }
+        })();
+
+        const dimStr = selectedQuote.dimensions && typeof selectedQuote.dimensions === 'object'
+          ? `${selectedQuote.dimensions.length_mm}x${selectedQuote.dimensions.width_mm}x${selectedQuote.dimensions.height_mm} mm`
+          : (selectedQuote.carton_length_mm 
+              ? `${selectedQuote.carton_length_mm}x${selectedQuote.carton_width_mm}x${selectedQuote.carton_height_mm} mm` 
+              : `${selectedQuote.dimensions || ''} mm`);
+
+        const plyStr = selectedQuote.ply_type ? `${selectedQuote.ply_type.replace('-', ' ')} Carton` : 'Carton';
+        const typeStr = selectedQuote.carton_type ? `${selectedQuote.carton_type} Type` : 'RSC Type';
+        const descStr = `${dimStr} - ${plyStr} - ${typeStr}`;
+        const displayQuoteNo = selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`;
+
+        return (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
+            {/* Inline Print Styles */}
+            <style>{`
+              @media print {
+                body * {
+                  visibility: hidden !important;
+                }
+                #printable-quotation-sheet, #printable-quotation-sheet * {
+                  visibility: visible !important;
+                }
+                #printable-quotation-sheet {
+                  position: fixed !important;
+                  left: 0 !important;
+                  top: 0 !important;
+                  width: 100% !important;
+                  margin: 0 !important;
+                  padding: 32px 40px !important;
+                  background: white !important;
+                  color: #111827 !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  z-index: 999999 !important;
+                }
+                .no-print-zone {
+                  display: none !important;
+                }
+              }
+            `}</style>
+
+            <div className={`rounded-3xl shadow-2xl max-w-3xl w-full p-4 sm:p-6 relative border flex flex-col max-h-[94vh] ${
+              isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30 shadow-black/60' : 'bg-[#fcfaf7] text-[#2d2417] border-[#dfd5bc]'
             }`}>
-              <h3 className={`text-lg sm:text-xl font-black flex items-center gap-2 ${
-                isDark ? 'text-[#f5deb3]' : 'text-[#1a130b]'
-              }`}>
-                <span>📄</span> Quote Details ({selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`})
-              </h3>
-              <button
-                onClick={() => setSelectedQuote(null)}
-                className="text-gray-500 hover:text-black dark:text-gray-300 dark:hover:text-white text-xl font-bold cursor-pointer p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Scrollable Content Body */}
-            <div className={`space-y-2.5 text-xs sm:text-sm overflow-y-auto pr-2 flex-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Customer:</span>
-                <span>{selectedQuote.customer_name}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Length:</span>
-                <span>{selectedQuote.dimensions.length_mm} mm</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Width:</span>
-                <span>{selectedQuote.dimensions.width_mm} mm</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Height:</span>
-                <span>{selectedQuote.dimensions.height_mm} mm</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Carton Type:</span>
-                <span>{selectedQuote.carton_type || 'RSC'}</span>
-              </div>
-              {selectedQuote.carton_type && selectedQuote.carton_type !== 'RSC' && selectedQuote.die_length_mm && selectedQuote.die_width_mm ? (
-                <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700 text-purple-500 font-semibold">
-                  <span className="font-semibold">Die Size (L × W):</span>
-                  <span>{selectedQuote.die_length_mm} × {selectedQuote.die_width_mm} mm</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Ply Type:</span>
-                <span>{selectedQuote.ply_type}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Board Type:</span>
-                <span>{selectedQuote.board_type}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Flute Type:</span>
-                <span>
-                  {selectedQuote.ply_type === '5-Ply'
-                    ? `${selectedQuote.flute_type || 'B-Flute'} & ${selectedQuote.flute_type_2 || selectedQuote.flute_type || 'B-Flute'}`
-                    : (selectedQuote.flute_type || 'B-Flute')}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Production Method:</span>
-                <span>{selectedQuote.production_method || 'In-house'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700">
-                <span className="font-semibold">Quantity:</span>
-                <span>{selectedQuote.quantity}</span>
-              </div>
-
-              {selectedQuote.sheet_dimensions && (
-                <>
-                  <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700 text-blue-500 font-semibold mt-2">
-                    <span>Sheet Size:</span>
-                    <span>{selectedQuote.sheet_dimensions.sheet_length_mm}×{selectedQuote.sheet_dimensions.sheet_width_mm} mm</span>
+              {/* Modal Header Bar with Format Switcher & Close button */}
+              <div className="no-print-zone flex flex-wrap items-center justify-between gap-2 border-b pb-3 mb-3 shrink-0 border-gray-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📄</span>
+                  <div>
+                    <h3 className={`text-base sm:text-lg font-black leading-tight ${isDark ? 'text-[#f5deb3]' : 'text-[#1a130b]'}`}>
+                      Official Quotation Preview
+                    </h3>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{displayQuoteNo}</span>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700 text-blue-500">
-                    <span>Optimal Reel Width:</span>
-                    <span>{selectedQuote.sheet_dimensions.selected_reel_mm} mm</span>
+                </div>
+
+                {/* Tax format toggle pills */}
+                <div className="flex items-center bg-gray-100 dark:bg-slate-800/80 p-1 rounded-xl text-xs font-semibold">
+                  <span className="px-2 text-gray-500 dark:text-gray-400 hidden sm:inline">Format:</span>
+                  <button
+                    type="button"
+                    onClick={() => setReportTaxFormat('auto')}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                      reportTaxFormat === 'auto'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
+                    }`}
+                    title="Auto-detect from saved quote tax setting"
+                  >
+                    Auto ({isVatCustomer ? 'VAT' : 'Non-VAT'})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportTaxFormat('vat')}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                      reportTaxFormat === 'vat'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    VAT (18%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportTaxFormat('non-vat')}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                      reportTaxFormat === 'non-vat'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    Non-VAT
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setSelectedQuote(null)}
+                  className="text-gray-400 hover:text-gray-700 dark:hover:text-white text-xl font-bold p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Scrollable Document Area (The Printed Quotation Sheet) */}
+              <div className="overflow-y-auto flex-1 pr-1">
+                <div 
+                  id="printable-quotation-sheet"
+                  className="bg-white text-gray-900 border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col justify-between"
+                  style={{ minHeight: '520px' }}
+                >
+                  {/* Top Company Header & Quotation Title */}
+                  <div>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-5 border-gray-200">
+                      {/* Left: 3D Packaging Cube Logo + Company Details */}
+                      <div className="flex items-center gap-3.5">
+                        <svg className="w-14 h-14 shrink-0 drop-shadow-sm" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          {/* Top facet - Forest Green */}
+                          <polygon points="24,5 43,15.5 24,26 5,15.5" fill="#15803d" stroke="#ffffff" strokeWidth="0.75" />
+                          {/* Left facet - Deep Red / Crimson */}
+                          <polygon points="5,15.5 24,26 24,42 5,31.5" fill="#b91c1c" stroke="#ffffff" strokeWidth="0.75" />
+                          {/* Right facet - Royal Blue */}
+                          <polygon points="24,26 43,15.5 43,31.5 24,42" fill="#1d4ed8" stroke="#ffffff" strokeWidth="0.75" />
+                          {/* Subtle tape line */}
+                          <line x1="24" y1="5" x2="24" y2="26" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeDasharray="2 1" />
+                        </svg>
+                        <div>
+                          <h2 className="text-base sm:text-lg font-black tracking-wide text-gray-900 uppercase font-sans leading-tight">
+                            CHELSY PACKAGING SOLUTIONS (PVT) LTD.
+                          </h2>
+                          <p className="text-xs text-gray-600 font-medium leading-relaxed mt-0.5">
+                            No 234/1/A, Siyambalape South, Siyambalape, Biyagama.
+                          </p>
+                          <p className="text-xs text-gray-600 font-medium">
+                            +94 0112 487486
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Quotation Title */}
+                      <div className="text-left sm:text-right w-full sm:w-auto">
+                        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-wider">
+                          Quotation
+                        </h1>
+                        <span className={`inline-block px-2.5 py-0.5 mt-1 text-[11px] font-bold rounded-full uppercase tracking-wider ${
+                          isVatCustomer ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {isVatCustomer ? 'VAT Customer' : 'Non-VAT Customer'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Metadata: Date, Quote No, Customer */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-4 text-xs sm:text-sm border-b border-gray-200">
+                      <div>
+                        <div className="flex gap-2">
+                          <span className="font-bold text-gray-700 min-w-18">Customer:</span>
+                          <span className="font-bold text-gray-900">{selectedQuote.customer_name}</span>
+                        </div>
+                      </div>
+                      <div className="sm:text-right space-y-1">
+                        <div className="flex sm:justify-end gap-2">
+                          <span className="font-bold text-gray-700">Date:</span>
+                          <span className="font-semibold text-gray-900">{displayDate}</span>
+                        </div>
+                        <div className="flex sm:justify-end gap-2">
+                          <span className="font-bold text-gray-700">Quotation Number:</span>
+                          <span className="font-bold text-gray-900 font-mono">{displayQuoteNo}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quotation Table */}
+                    <div className="mt-5 overflow-x-auto">
+                      <table className="w-full text-xs sm:text-sm border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-gray-100 text-gray-800 border-b border-gray-300 font-bold">
+                            <th className="py-2.5 px-3 text-center border-r border-gray-300 w-12">S.N</th>
+                            <th className="py-2.5 px-4 text-left border-r border-gray-300">Description</th>
+                            <th className="py-2.5 px-3 text-right border-r border-gray-300 w-24">QTY</th>
+                            <th className="py-2.5 px-3 text-center border-r border-gray-300 w-16">Unit</th>
+                            <th className="py-2.5 px-3 text-right border-r border-gray-300 w-24">Price</th>
+                            <th className="py-2.5 px-4 text-right w-28">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b border-gray-200 hover:bg-gray-50/50">
+                            <td className="py-3 px-3 text-center font-medium text-gray-600 border-r border-gray-300">1</td>
+                            <td className="py-3 px-4 font-semibold text-gray-900 border-r border-gray-300">
+                              <div>{descStr}</div>
+                              {selectedQuote.carton_type && selectedQuote.carton_type !== 'RSC' && selectedQuote.die_length_mm && selectedQuote.die_width_mm ? (
+                                <div className="text-[11px] text-gray-500 font-normal mt-0.5">
+                                  Die Size: {selectedQuote.die_length_mm} × {selectedQuote.die_width_mm} mm
+                                </div>
+                              ) : null}
+                            </td>
+                            <td className="py-3 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">
+                              {qty.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3 text-center text-gray-700 border-r border-gray-300">
+                              Nos
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
+                              {unitPrice.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">
+                              {subtotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Total Summary Breakdown */}
+                    <div className="mt-5 flex justify-end">
+                      <div className="w-full sm:w-72 space-y-1.5 text-xs sm:text-sm">
+                        {isVatCustomer ? (
+                          <>
+                            <div className="flex justify-between py-1 text-gray-700 border-b border-gray-100">
+                              <span className="font-semibold">Sub Total:</span>
+                              <span className="font-mono font-bold">
+                                Rs. {subtotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div className="flex justify-between py-1 text-gray-700 border-b border-gray-100">
+                              <span className="font-semibold">Vat - 18%:</span>
+                              <span className="font-mono font-bold">
+                                Rs. {vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div className="flex justify-between py-2 text-base font-black text-gray-900 border-t-2 border-b-2 border-gray-900 mt-1">
+                              <span>Total:</span>
+                              <span className="font-mono">
+                                Rs. {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex justify-between py-2 text-base font-black text-gray-900 border-t-2 border-b-2 border-gray-900">
+                            <span>Total:</span>
+                            <span className="font-mono">
+                              Rs. {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  {selectedQuote.sheet_dimensions.sheets_per_reel !== undefined && (
-                    <>
-                      <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700 text-blue-500">
-                        <span>Sheets cut from Reel:</span>
-                        <span>{selectedQuote.sheet_dimensions.sheets_per_reel}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-gray-100 dark:border-slate-700 text-blue-500">
-                        <span>Leftover Reel Waste:</span>
-                        <span>{selectedQuote.sheet_dimensions.reel_waste_mm} mm</span>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
 
-              {/* Financial parameters */}
-              <div className={`p-4 rounded-2xl border mt-3 space-y-2 text-xs ${
-                isDark ? 'bg-[#1a2332] border-[#c5a880]/20 text-slate-100' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
-              }`}>
-                <div className={`flex justify-between font-semibold ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
-                  <span>Invoice Value (Qty * Price):</span>
-                  <span>Rs. {(selectedQuote.final_cost_per_carton * selectedQuote.quantity).toFixed(2)}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
-                </div>
-                <div className={`flex justify-between font-semibold ${isDark ? 'text-[#c5a880]' : 'text-[#8c734b]'}`}>
-                  <span>Total RM Cost (RM Cost * Qty):</span>
-                  <span>Rs. {((selectedQuote.rm_cost_per_carton || 0) * selectedQuote.quantity).toFixed(2)}</span>
-                </div>
-                <div className={`flex justify-between font-semibold ${isDark ? 'text-white' : 'text-[#5c4c36]'}`}>
-                  <span>Net Profit (Profit Amount * Qty):</span>
-                  <span>Rs. {((selectedQuote.profit_per_carton || 0) * selectedQuote.quantity).toFixed(2)}</span>
+                  {/* Document Footer Notes & Signatures */}
+                  <div className="mt-10 pt-6 border-t border-gray-200 text-xs text-gray-500 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
+                    <div>
+                      <p className="font-semibold text-gray-700">Chelsy Packaging Solutions (Pvt) Ltd.</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Thank you for your business. Quotation validity: 14 days.</p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <div className="w-48 border-b border-gray-400 mb-1"></div>
+                      <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Authorized Signature</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div
-                style={{
-                  backgroundColor: isDark ? '#1a2332' : '#8c734b',
-                  color: isDark ? '#e2d4c0' : '#ffffff'
-                }}
-                className={`mt-4 rounded-2xl p-4 sm:p-5 shadow-xs border ${
-                  isDark 
-                    ? 'bg-[#1a2332] text-[#e2d4c0] bg-gradient-to-r from-[#1a2332] to-[#131924] border-[#c5a880]/30' 
-                    : 'bg-[#8c734b] text-white bg-gradient-to-r from-[#8c734b] to-[#5c4c36] border-[#dfd5bc]'
-                }`}
-              >
-                <div className="flex justify-between mb-2">
-                  <span className="opacity-95">Cost per Carton:</span>
-                  <span className="text-lg sm:text-xl font-bold">Rs. {selectedQuote.final_cost_per_carton}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="opacity-95">Total Batch Cost:</span>
-                  <span className="text-lg sm:text-xl font-bold">Rs. {selectedQuote.total_cost_batch}{selectedQuote.tax_type && !selectedQuote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
-                </div>
+              {/* Modal Action Buttons: Delete Quote, Print Quotation, Close */}
+              <div className="no-print-zone mt-4 pt-3 border-t border-gray-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no)}
+                  className="font-bold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 text-sm shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  <span>🗑️</span> Delete Quote
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-white bg-blue-600 hover:bg-blue-700 border-blue-700 shadow-md text-sm flex items-center justify-center gap-1.5 hover:scale-[1.01]"
+                >
+                  <span>🖨️</span> Print Quotation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedQuote(null)}
+                  style={{
+                    backgroundColor: isDark ? '#1a2332' : '#2d2417',
+                    color: '#ffffff'
+                  }}
+                  className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-sm text-white flex items-center justify-center"
+                >
+                  Close
+                </button>
               </div>
-            </div>
-
-            {/* Footer Buttons (fixed at bottom of modal) */}
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-800 grid grid-cols-2 gap-3 shrink-0">
-              <button
-                onClick={() => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no)}
-                className="font-bold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 text-sm shadow-xs"
-              >
-                🗑️ Delete Quote
-              </button>
-              <button
-                onClick={() => setSelectedQuote(null)}
-                style={{
-                  backgroundColor: isDark ? '#1a2332' : '#2d2417',
-                  color: '#ffffff'
-                }}
-                className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-sm text-white"
-              >
-                Close
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

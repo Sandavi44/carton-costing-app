@@ -46,6 +46,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const dieLength = parseFloat(formData.dieLength || calculatedCost.dimensions?.die_length_mm || 0);
   const dieWidth = parseFloat(formData.dieWidth || calculatedCost.dimensions?.die_width_mm || 0);
   const isDieCut = cartonType !== 'RSC';
+  const isTwoUp = calculatedCost.sheet_dimensions?.is_two_up || (cartonType === 'RSC' && (((L + W) * 2 + ((ply === '2-Ply' || ply === '3-Ply') ? 62 : 75)) > 1938));
 
   const cartonCategory = calculatedCost.dimensions?.carton_category || calculatedCost.category?.carton_category || (
     (calculatedCost.sheet_dimensions.board_area_m2 <= 0.450) ? 'S' : (calculatedCost.sheet_dimensions.board_area_m2 <= 0.800) ? 'M' : 'L'
@@ -56,9 +57,9 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const proposedPrint = calculatedCost.category?.proposed_costs?.print_cost ?? (
     formData.isPrinted ? (cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.0 : 6.0) : 0
   );
-  const proposedSlotting = calculatedCost.category?.proposed_costs?.slotting_cost ?? (
+  const proposedSlotting = (cartonType === 'RSC') ? (calculatedCost.category?.proposed_costs?.slotting_cost ?? (
     (ply === '2-Ply' || ply === '3-Ply') ? 1.75 : 2.50
-  );
+  )) : 0.0;
 
   // Retrieve calculated results
   const sheetLength = calculatedCost.sheet_dimensions.sheet_length_mm;
@@ -83,7 +84,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const overheadPerCarton = calculatedCost.per_carton_costs.overhead;
   const joiningCost = calculatedCost.per_carton_costs.joining;
   const printCost = calculatedCost.per_carton_costs.print;
-  const slotting = parseFloat(formData.slottingCost || 0);
+  const slotting = (cartonType === 'RSC') ? parseFloat(formData.slottingCost || 0) : 0;
   const bundling = parseFloat(formData.bundlingCost || 0);
   const diecutting = parseFloat(formData.diecuttingCost || 0);
   const additional = slotting + bundling + diecutting;
@@ -175,10 +176,29 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                 <div>
                   <p className="text-sm font-semibold">1. Sheet Length Calculation</p>
                   <div className={solveBoxClass}>
-                    <p className="opacity-70">Equation: {(ply === '2-Ply' || ply === '3-Ply') ? 'Length = (L + W) * 2 + 62' : 'Length = (L + W) * 2 + 75'}</p>
-                    <p className="text-blue-500 font-bold mt-1">
-                      Solve: ({L} + {W}) * 2 + {(ply === '2-Ply' || ply === '3-Ply') ? 62 : 75} = {sheetLength.toFixed(2)} mm
-                    </p>
+                    {isTwoUp ? (
+                      <>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                            ⚠️ 2-Up Method (Standard Sheet Length &gt; 1938 mm)
+                          </span>
+                        </div>
+                        <p className="opacity-70 text-xs">
+                          Standard length (({L} + {W}) * 2 + {(ply === '2-Ply' || ply === '3-Ply') ? 62 : 75} = {((L + W) * 2 + ((ply === '2-Ply' || ply === '3-Ply') ? 62 : 75)).toFixed(2)} mm) exceeds 1938 mm. Produced as 2-up method → length side allowance increased from 62 mm to 130 mm:
+                        </p>
+                        <p className="opacity-70 font-semibold mt-1">Equation: Length = (L + W) * 2 + 130</p>
+                        <p className="text-blue-500 font-bold mt-1">
+                          Solve: ({L} + {W}) * 2 + 130 = {sheetLength.toFixed(2)} mm
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="opacity-70">Equation: {(ply === '2-Ply' || ply === '3-Ply') ? 'Length = (L + W) * 2 + 62' : 'Length = (L + W) * 2 + 75'}</p>
+                        <p className="text-blue-500 font-bold mt-1">
+                          Solve: ({L} + {W}) * 2 + {(ply === '2-Ply' || ply === '3-Ply') ? 62 : 75} = {sheetLength.toFixed(2)} mm
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -507,9 +527,9 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
               <div className={solveBoxClass}>
                 {hasTransport ? (
                   <>
-                    <p className="opacity-70">Equation: Transport Per Carton = Total Transport Cost / Quantity</p>
+                    <p className="opacity-70">Equation: Transport Cost Per Carton (Direct Input) = Rs. {transportCost.toFixed(2)} per carton</p>
                     <p className="text-blue-500 font-bold mt-1">
-                      Solve: Rs. {transportCost.toFixed(2)} / {Qty} = Rs. {transport.toFixed(2)} per carton
+                      Solve: Input per carton = Rs. {transportCost.toFixed(2)} / carton (Total Order Transport: Rs. {(transportCost * Qty).toFixed(2)})
                     </p>
                   </>
                 ) : (
