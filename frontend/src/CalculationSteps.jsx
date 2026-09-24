@@ -583,34 +583,37 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
         <div className={cardClass}>
           <h3 className={phaseHeaderClass}>Phase 9: Key Financial Metrics</h3>
 
-          {/* 3 Metric Cards matching CostingApp */}
+          {/* 3 Metric Cards matching CostingApp with Increased Bottom Row Letter Size */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className={`p-4 rounded-2xl border text-center transition ${
-              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+            <div className={`p-5 rounded-3xl border text-center shadow-md transition ${
+              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
             }`}>
-              <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Invoice Value</p>
-              <p className="text-xl font-black">Rs. {totalInvoiceValue.toFixed(2)}{!isNonVat ? ' + VAT' : ''}</p>
-              <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#166534]'}`}>Invoice Value</p>
+              <p className="text-2xl sm:text-3xl font-black">Rs. {totalInvoiceValue.toFixed(2)}{!isNonVat ? ' + VAT' : ''}</p>
+              {/* Bottom row: letter size increased for better visual effect */}
+              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>
                 Rs. {finalCost.toFixed(2)}{!isNonVat ? ' + VAT' : ''} × {Qty}
               </p>
             </div>
             
-            <div className={`p-4 rounded-2xl border text-center transition ${
-              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+            <div className={`p-5 rounded-3xl border text-center shadow-md transition ${
+              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
             }`}>
-              <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Total RM Cost</p>
-              <p className="text-xl font-black">Rs. {totalRmCost.toFixed(2)}</p>
-              <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#166534]'}`}>Total RM Cost</p>
+              <p className="text-2xl sm:text-3xl font-black">Rs. {totalRmCost.toFixed(2)}</p>
+              {/* Bottom row: letter size increased for better visual effect */}
+              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>
                 Rs. {rmCost.toFixed(2)} × {Qty}
               </p>
             </div>
             
-            <div className={`p-4 rounded-2xl border text-center transition ${
-              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+            <div className={`p-5 rounded-3xl border text-center shadow-md transition ${
+              isDark ? 'bg-[#1a2332] border-[#c5a880]/25 text-white' : 'bg-[#eaf5ea] border-[#bbf7d0] text-[#14532d]'
             }`}>
-              <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>Net Profit</p>
-              <p className="text-xl font-black">Rs. {totalNetProfit.toFixed(2)}</p>
-              <p className={`text-xs mt-1 font-mono ${isDark ? 'text-slate-400' : 'text-[#8c734b]/70'}`}>
+              <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-[#d4af37]' : 'text-[#166534]'}`}>Net Profit</p>
+              <p className="text-2xl sm:text-3xl font-black">Rs. {totalNetProfit.toFixed(2)}</p>
+              {/* Bottom row: letter size increased for better visual effect */}
+              <p className={`text-sm sm:text-base font-bold mt-2 font-mono ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>
                 Rs. {profitAmount.toFixed(2)} × {Qty}
               </p>
             </div>
