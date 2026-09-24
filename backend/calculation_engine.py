@@ -34,6 +34,7 @@ class JoiningType(Enum):
 
 class FluteType(Enum):
     """Flute corrugation types"""
+    E_FLUTE = 1.26
     B_FLUTE = 1.35
     C_FLUTE = 1.43
 
@@ -124,7 +125,7 @@ class CostingParameters:
     # Material specifications
     ply_type: str  # "2-Ply", "3-Ply", "5-Ply", "7-Ply"
     board_type: str  # "Whitecut", "Bluecut"
-    flute_type: str  # "B-Flute", "C-Flute"
+    flute_type: str  # "B-Flute", "C-Flute", "E-Flute"
     joining_type: str  # "Glued", "Stitched"
     is_printed: bool
     
@@ -463,10 +464,26 @@ class CostingCalculator:
         """Calculate total GSM with wave factors"""
         gsm = self.params.gsm_values
         
-        # Flute wave factors (B-Flute: 1.35, C-Flute: 1.43)
-        wave_factor_1 = 1.35 if self.params.flute_type == "B-Flute" else 1.43
+        # Flute wave factors (E-Flute: 1.26, B-Flute: 1.35, C-Flute: 1.43)
+        def get_wave_factor(flute: str) -> float:
+            if not flute:
+                return 1.35
+            f = str(flute).strip()
+            if f in ["E-Flute", "E Flute", "E"]:
+                return 1.26
+            elif f in ["B-Flute", "B Flute", "B"]:
+                return 1.35
+            elif f in ["C-Flute", "C Flute", "C"]:
+                return 1.43
+            if "E" in f.upper():
+                return 1.26
+            if "C" in f.upper():
+                return 1.43
+            return 1.35
+
+        wave_factor_1 = get_wave_factor(self.params.flute_type)
         flute_2 = getattr(self.params, 'flute_type_2', None) or self.params.flute_type
-        wave_factor_2 = 1.35 if flute_2 == "B-Flute" else 1.43
+        wave_factor_2 = get_wave_factor(flute_2)
         
         if self.params.ply_type == "2-Ply":
             # 2-Ply: Liner 1 (Outer 1) + (Flute 1 × Factor 1)

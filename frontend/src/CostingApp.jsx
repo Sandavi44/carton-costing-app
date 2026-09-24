@@ -1043,6 +1043,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             <select name="fluteType" value={formData.fluteType} onChange={handleInputChange} className={selectClass}>
               <option value="B-Flute">B-Flute (1.35)</option>
               <option value="C-Flute">C-Flute (1.43)</option>
+              <option value="E-Flute">E-Flute (1.26)</option>
             </select>
           </div>
 
@@ -1052,6 +1053,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               <select name="fluteType2" value={formData.fluteType2 || 'B-Flute'} onChange={handleInputChange} className={selectClass}>
                 <option value="B-Flute">B-Flute (1.35)</option>
                 <option value="C-Flute">C-Flute (1.43)</option>
+                <option value="E-Flute">E-Flute (1.26)</option>
               </select>
             </div>
           )}

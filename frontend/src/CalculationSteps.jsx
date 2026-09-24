@@ -29,8 +29,13 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const boardType = formData.boardType;
   const flute1 = formData.fluteType || calculatedCost.material?.flute_type || 'B-Flute';
   const flute2 = formData.fluteType2 || calculatedCost.material?.flute_type_2 || flute1;
-  const wf1 = flute1 === 'B-Flute' ? 1.35 : 1.43;
-  const wf2 = flute2 === 'B-Flute' ? 1.35 : 1.43;
+  const getWaveFactor = (flute) => {
+    if (flute === 'E-Flute' || flute === 'E') return 1.26;
+    if (flute === 'B-Flute' || flute === 'B') return 1.35;
+    return 1.43;
+  };
+  const wf1 = getWaveFactor(flute1);
+  const wf2 = getWaveFactor(flute2);
   const g1 = parseFloat(formData.gsm1) || 0;
   const g2 = parseFloat(formData.gsm2) || 0;
   const g3 = parseFloat(formData.gsm3) || 0;
