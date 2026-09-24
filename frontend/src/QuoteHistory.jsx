@@ -247,10 +247,12 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h2 className={`text-2xl font-bold flex items-center gap-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
-          <span>📜</span> Quote History
-        </h2>
+      {/* Main Quote History Table & Controls (hidden in print mode so it occupies 0 height) */}
+      <div className="quote-history-main-content">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className={`text-2xl font-bold flex items-center gap-2 ${isDark ? 'text-[#d4af37]' : 'text-[#8c734b]'}`}>
+            <span>📜</span> Quote History
+          </h2>
         <button
           onClick={fetchHistory}
           className={`font-semibold px-4 py-2 rounded-lg transition text-sm cursor-pointer shadow-xs border ${
@@ -427,6 +429,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
           </table>
         </div>
       )}
+      </div>
 
       {/* CHOICE PROMPT MODAL */}
       {actionPromptQuote && (
@@ -530,30 +533,73 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
 
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
-            {/* Inline Print Styles */}
+            {/* Inline Print Styles: Forces clean 1-Page Quotation */}
             <style>{`
               @media print {
-                body * {
-                  visibility: hidden !important;
+                @page {
+                  size: A4 portrait;
+                  margin: 10mm 14mm;
                 }
-                #printable-quotation-sheet, #printable-quotation-sheet * {
-                  visibility: visible !important;
-                }
-                #printable-quotation-sheet {
-                  position: fixed !important;
-                  left: 0 !important;
-                  top: 0 !important;
-                  width: 100% !important;
+                html, body {
+                  height: auto !important;
+                  overflow: visible !important;
+                  background: white !important;
                   margin: 0 !important;
-                  padding: 32px 40px !important;
+                  padding: 0 !important;
+                }
+                /* Hide everything in the background so it takes 0 height */
+                .quote-history-main-content,
+                .no-print-zone,
+                nav,
+                header,
+                footer {
+                  display: none !important;
+                }
+                /* Reset modal wrapper so it doesn't create extra pages */
+                .fixed.inset-0 {
+                  position: static !important;
+                  inset: auto !important;
+                  background: transparent !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  max-height: none !important;
+                  overflow: visible !important;
+                  display: block !important;
+                }
+                .max-w-3xl {
+                  max-width: 100% !important;
+                  width: 100% !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  background: transparent !important;
+                  max-height: none !important;
+                  overflow: visible !important;
+                }
+                .overflow-y-auto {
+                  overflow: visible !important;
+                  max-height: none !important;
+                  height: auto !important;
+                  padding: 0 !important;
+                }
+                /* The Printable Quotation Sheet: Single Page, Natural Flow */
+                #printable-quotation-sheet {
+                  position: static !important;
+                  width: 100% !important;
+                  margin: 0 auto !important;
+                  padding: 10px 15px !important;
                   background: white !important;
                   color: #111827 !important;
                   border: none !important;
                   box-shadow: none !important;
-                  z-index: 999999 !important;
-                }
-                .no-print-zone {
-                  display: none !important;
+                  min-height: auto !important;
+                  page-break-inside: avoid !important;
+                  break-inside: avoid !important;
+                  page-break-after: avoid !important;
+                  break-after: avoid !important;
                 }
               }
             `}</style>
@@ -625,8 +671,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               <div className="overflow-y-auto flex-1 pr-1">
                 <div 
                   id="printable-quotation-sheet"
-                  className="bg-white text-gray-900 border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col justify-between"
-                  style={{ minHeight: '520px' }}
+                  className="bg-white text-gray-900 border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col justify-between min-h-[480px] print:min-h-0 print:border-none print:shadow-none"
                 >
                   {/* Top Company Header & Quotation Title */}
                   <div>
