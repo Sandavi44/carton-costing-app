@@ -112,7 +112,7 @@ function App() {
   }, []);
 
   if (!token) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return <Login onLoginSuccess={handleLoginSuccess} theme={theme} toggleTheme={toggleTheme} />;
   }
 
   return (
