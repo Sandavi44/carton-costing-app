@@ -645,7 +645,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                         </svg>
                         <div>
                           <h2 className="text-base sm:text-lg font-black tracking-wide text-gray-900 uppercase font-sans leading-tight">
-                            CHELSY PACKAGING SOLUTIONS (PVT) LTD.
+                            {isVatCustomer ? 'CHELSY PACKAGING SOLUTIONS (PVT) LTD.' : 'CHELSY PACKAGING PVT LTD'}
                           </h2>
                           <p className="text-xs text-gray-600 font-medium leading-relaxed mt-0.5">
                             No 234/1/A, Siyambalape South, Siyambalape, Biyagama.
@@ -769,7 +769,9 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   {/* Document Footer Notes & Signatures */}
                   <div className="mt-10 pt-6 border-t border-gray-200 text-xs text-gray-500 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
                     <div>
-                      <p className="font-semibold text-gray-700">Chelsy Packaging Solutions (Pvt) Ltd.</p>
+                      <p className="font-semibold text-gray-700">
+                        {isVatCustomer ? 'Chelsy Packaging Solutions (Pvt) Ltd.' : 'Chelsy Packaging Pvt Ltd'}
+                      </p>
                       <p className="text-[11px] text-gray-500 mt-0.5">Thank you for your business. Quotation validity: 14 days.</p>
                     </div>
                     <div className="text-left sm:text-right">
