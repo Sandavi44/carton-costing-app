@@ -3,24 +3,20 @@ CORRUGATED CARTON COSTING SYSTEM - PRODUCTION BACKEND (CORRECTED)
 Flask API with simplified rates and corrected overhead logic
 """
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import os
-import io
 import json
-import time
 from dotenv import load_dotenv
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
-# Import calculation engine & PDF generator
+# Import calculation engine
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
 from calculation_engine import CostingCalculator, CostingParameters
-from pdf_generator import generate_quotation_pdf, BANK_DETAILS_VAT, BANK_DETAILS_NON_VAT
 
 load_dotenv()
 
@@ -57,7 +53,7 @@ _allowed_origins = [
 if _frontend_url:
     _allowed_origins.append(_frontend_url.rstrip('/'))
 
-CORS(app, origins=_allowed_origins, supports_credentials=True, expose_headers=['Content-Disposition', 'X-Quotation-Hash'])
+CORS(app, origins=_allowed_origins, supports_credentials=True)
 
 # ── Database ──────────────────────────────────────────────────────────────────
 # Render provides DATABASE_URL as postgres://... but SQLAlchemy needs postgresql://
@@ -67,15 +63,11 @@ if _db_url.startswith('postgres://'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'chelsy-packaging-secret-key-2026-secure')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', app.config['SECRET_KEY'])
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
-
-# Secure short-lived URL serializer for tamper-proof PDF downloads
-pdf_serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='quote-pdf-download-v1')
 
 # ============================================================================
 # DATABASE MODELS - CORRECTED
@@ -721,131 +713,6 @@ def delete_quote(quote_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
-
-
-# ============================================================================
-# SECURE BANKING & PDF PIPELINE ENDPOINTS
-# ============================================================================
-
-@app.route('/api/company/banking-details', methods=['GET'])
-@jwt_required()
-def get_banking_details():
-    """
-    Protected endpoint: Return company banking details strictly to authenticated users.
-    Never exposed to unauthenticated public visitors or external endpoints.
-    """
-    return jsonify({
-        'vat': BANK_DETAILS_VAT,
-        'non_vat': BANK_DETAILS_NON_VAT
-    }), 200
-
-
-@app.route('/api/quotes/<int:quote_id>/pdf-ticket', methods=['POST'])
-@jwt_required()
-def generate_pdf_ticket(quote_id):
-    """
-    Protected endpoint: Issue a short-lived, cryptographically signed URL token
-    for downloading the tamper-proof quotation PDF.
-    - Valid for 10 minutes (600 seconds)
-    - Cryptographically signed with HMAC SHA-256
-    - Prevents predictable public file paths
-    """
-    try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-        if user and user.is_admin:
-            quote = Quote.query.filter_by(id=quote_id).first()
-        else:
-            quote = Quote.query.filter_by(id=quote_id, user_id=user_id).first()
-
-        if not quote:
-            return jsonify({'error': 'Quote not found'}), 404
-
-        data = request.get_json(silent=True) or {}
-        tax_format = data.get('tax_format', 'auto')
-
-        # Sign short-lived token (10 minutes)
-        payload = {
-            'quote_id': quote.id,
-            'user_id': user_id,
-            'tax_format': tax_format,
-            'iat': int(time.time())
-        }
-        signed_token = pdf_serializer.dumps(payload)
-
-        return jsonify({
-            'download_url': f'/api/quotes/download-pdf?token={signed_token}',
-            'expires_in_seconds': 600,
-            'quote_no': f"QT-{str(quote.id).zfill(5)}"
-        }), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
-
-
-@app.route('/api/quotes/download-pdf', methods=['GET'])
-def download_quote_pdf():
-    """
-    Secure PDF delivery endpoint:
-    - Validates short-lived HMAC signed token (max_age = 600s = 10 minutes)
-    - Rejects missing, expired, or tampered signatures with 403 Forbidden
-    - Generates tamper-proof, flattened, encrypted PDF in-memory (no predictable file paths)
-    """
-    token = request.args.get('token')
-    if not token:
-        return jsonify({'error': 'Access denied: missing secure PDF download token'}), 403
-
-    try:
-        payload = pdf_serializer.loads(token, max_age=600)
-    except SignatureExpired:
-        return jsonify({'error': 'The download link has expired (valid for 10 minutes). Please generate a new download link.'}), 403
-    except BadSignature:
-        return jsonify({'error': 'Access denied: invalid or tampered download token.'}), 403
-    except Exception as e:
-        return jsonify({'error': f'Invalid token: {str(e)}'}), 403
-
-    quote_id = payload.get('quote_id')
-    tax_format = payload.get('tax_format', 'auto')
-
-    quote = Quote.query.get(quote_id)
-    if not quote:
-        return jsonify({'error': 'Quotation not found'}), 404
-
-    try:
-        pdf_bytes, doc_hash = generate_quotation_pdf(
-            quote=quote,
-            tax_format=tax_format,
-            secret_key=app.config['SECRET_KEY']
-        )
-
-        quote_no = getattr(quote, 'quote_no', None) or f"QT-{str(quote.id).zfill(5)}"
-        cust_name = (quote.customer_name or 'Customer').replace(' ', '_')
-        filename = f"Quotation_{quote_no}_{cust_name}.pdf"
-
-        response = send_file(
-            io.BytesIO(pdf_bytes),
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=filename
-        )
-        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Quotation-Hash'] = doc_hash
-        return response
-    except Exception as e:
-        return jsonify({'error': f'Failed to generate PDF: {str(e)}'}), 500
-
-
-@app.route('/', methods=['GET'])
-def index():
-    """Root endpoint: Return API status and link to the live frontend application"""
-    frontend = os.getenv('FRONTEND_URL', 'https://carton-costing-app-1.onrender.com')
-    return jsonify({
-        'service': 'carton-costing-api',
-        'status': 'online',
-        'message': 'Carton Costing API is running. Visit the web app at the frontend link below.',
-        'frontend_url': frontend
-    }), 200
 
 
 @app.route('/api/health', methods=['GET'])
