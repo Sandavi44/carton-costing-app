@@ -418,10 +418,42 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     whiteLinerRate: '285',
     brownLinerRate: '260',
   });
-  const [showInches, setShowInches] = useState(false);
+  const dimUnit = formData.dimensionUnit || 'mm'; // 'mm' or 'inches'
   const isDark = theme === 'dark';
   const isSand = theme === 'sand';
   const isGreen = !isDark && !isSand;
+
+  // Convert input dimension value to mm rounded to nearest whole mm for all internal formulas and database persistence
+  const toMM = (val) => {
+    if (!val || isNaN(val) || String(val).trim() === '') return 0;
+    const num = parseFloat(val);
+    return dimUnit === 'inches' ? Math.round(num * 25.4) : Math.round(num);
+  };
+
+  // Click-box unit switch handler: converts existing numbers smoothly between mm and inches in same inputs
+  const handleUnitChange = (newUnit) => {
+    if (newUnit === dimUnit) return;
+    setFormData(prev => {
+      const convertVal = (v) => {
+        if (!v || isNaN(v) || String(v).trim() === '') return '';
+        const n = parseFloat(v);
+        if (newUnit === 'inches') {
+          return (n / 25.4).toFixed(2).replace(/\.00$/, '');
+        } else {
+          return Math.round(n * 25.4).toString();
+        }
+      };
+      return {
+        ...prev,
+        dimensionUnit: newUnit,
+        cartonLength: convertVal(prev.cartonLength),
+        cartonWidth: convertVal(prev.cartonWidth),
+        cartonHeight: convertVal(prev.cartonHeight),
+        dieLength: convertVal(prev.dieLength),
+        dieWidth: convertVal(prev.dieWidth),
+      };
+    });
+  };
 
   // Fetch live system parameters (White Liner rate & Brown Liner rate) from admin parameters
   useEffect(() => {
@@ -442,12 +474,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
           // Sync default rate into form if it is empty or matches previous default
           setFormData(prev => {
-            const activeField = prev.boardType === 'Whitecut' ? 'whiteLinerRate' : 'brownLinerRate';
+            const isWhite = prev.boardType === 'White Liner' || prev.boardType === 'Whitecut';
+            const activeField = isWhite ? 'whiteLinerRate' : 'brownLinerRate';
             const currentVal = prev[activeField];
             if (!currentVal || currentVal === '285' || currentVal === '260') {
               return {
                 ...prev,
-                [activeField]: prev.boardType === 'Whitecut' ? white : brown,
+                [activeField]: isWhite ? white : brown,
                 totalOverheadForOrder: prev.totalOverheadForOrder || '1000'
               };
             }
@@ -467,14 +500,15 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       let changed = false;
       const updated = { ...prev };
       if (!updated.boardType) {
-        updated.boardType = 'Browncut';
+        updated.boardType = 'Brown Liner';
         changed = true;
       }
-      if (updated.boardType === 'Browncut' && !updated.brownLinerRate) {
+      const isWhite = updated.boardType === 'White Liner' || updated.boardType === 'Whitecut';
+      if (!isWhite && !updated.brownLinerRate) {
         updated.brownLinerRate = systemRates.brownLinerRate || '260';
         changed = true;
       }
-      if (updated.boardType === 'Whitecut' && !updated.whiteLinerRate) {
+      if (isWhite && !updated.whiteLinerRate) {
         updated.whiteLinerRate = systemRates.whiteLinerRate || '285';
         changed = true;
       }
@@ -505,24 +539,25 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     });
   }, [systemRates]);
 
-  // Current live category and proposed costs
+  // Current live category and proposed costs (with internal mm conversion if in inches)
+  const mmFormData = useMemo(() => ({
+    ...formData,
+    cartonLength: toMM(formData.cartonLength),
+    cartonWidth: toMM(formData.cartonWidth),
+    cartonHeight: toMM(formData.cartonHeight),
+    dieLength: toMM(formData.dieLength),
+    dieWidth: toMM(formData.dieWidth),
+  }), [formData.cartonLength, formData.cartonWidth, formData.cartonHeight, formData.dieLength, formData.dieWidth, dimUnit]);
+
   const { boardArea: currentBoardArea, category: currentCategory, isTwoUp: currentIsTwoUp } = useMemo(() => {
-    return calculateBoardAreaAndCategory(formData);
-  }, [
-    formData.cartonLength,
-    formData.cartonWidth,
-    formData.cartonHeight,
-    formData.cartonType,
-    formData.dieLength,
-    formData.dieWidth,
-    formData.plyType
-  ]);
+    return calculateBoardAreaAndCategory(mmFormData);
+  }, [mmFormData, formData.cartonType, formData.plyType]);
 
   const { proposedJoining, proposedPrint, proposedSlotting } = useMemo(() => {
-    return getProposedCosts(formData, currentCategory);
+    return getProposedCosts(mmFormData, currentCategory);
   }, [
     formData.joiningType,
-    formData.cartonHeight,
+    mmFormData.cartonHeight,
     formData.isPrinted,
     formData.plyType,
     formData.cartonType,
@@ -617,7 +652,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
   // HANDLERS
   const getActiveRateFieldName = (boardType) => {
-    return boardType === 'Whitecut' ? 'whiteLinerRate' : 'brownLinerRate';
+    return (boardType === 'White Liner' || boardType === 'Whitecut') ? 'whiteLinerRate' : 'brownLinerRate';
   };
 
   const handleInputChange = (e) => {
@@ -628,7 +663,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         [name]: type === 'checkbox' ? checked : value
       };
       if (name === 'boardType') {
-        if (value === 'Whitecut') {
+        if (value === 'White Liner' || value === 'Whitecut') {
           updated.whiteLinerRate = systemRates.whiteLinerRate || '285';
           updated.brownLinerRate = '';
         } else {
@@ -786,9 +821,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
       const payload = {
         customer_name: formData.customerName,
-        carton_length_mm: parseFloat(formData.cartonLength),
-        carton_width_mm: parseFloat(formData.cartonWidth),
-        carton_height_mm: parseFloat(formData.cartonHeight),
+        carton_length_mm: toMM(formData.cartonLength),
+        carton_width_mm: toMM(formData.cartonWidth),
+        carton_height_mm: toMM(formData.cartonHeight),
         quantity: parseInt(formData.quantity),
         ply_type: formData.plyType,
         board_type: formData.boardType,
@@ -796,8 +831,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         flute_type_2: formData.fluteType2 || formData.fluteType,
         production_method: formData.productionMethod || 'In-house',
         carton_type: formData.cartonType || 'RSC',
-        die_length_mm: parseFloat(formData.dieLength || 0),
-        die_width_mm: parseFloat(formData.dieWidth || 0),
+        die_length_mm: toMM(formData.dieLength),
+        die_width_mm: toMM(formData.dieWidth),
         joining_type: formData.joiningType,
         is_printed: formData.isPrinted,
         white_liner_rate: parseFloat(formData.whiteLinerRate || 0),
@@ -839,9 +874,10 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     try {
       const gsmArray = buildGSMArray();
       const isNonVat = (formData.taxType || calculatedCost?.tax?.tax_type || '').includes('Non-VAT');
-      const finalCost = isNonVat
+      const rawFinalCost = isNonVat
         ? ((calculatedCost.commissions?.cost_after_commissions ?? calculatedCost.profit?.cost_with_profit ?? 0) + (calculatedCost.transport?.transport_per_carton ?? 0))
         : parseFloat(calculatedCost.final?.final_cost_per_carton || 0);
+      const finalCost = Math.round(rawFinalCost * 4) / 4;
       const batchCost = finalCost * (parseFloat(formData.quantity) || 1);
 
       const payloadCalculatedCost = {
@@ -857,9 +893,25 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         }
       };
 
+      const mmLength = toMM(formData.cartonLength);
+      const mmWidth = toMM(formData.cartonWidth);
+      const mmHeight = toMM(formData.cartonHeight);
+      const mmDieLength = toMM(formData.dieLength);
+      const mmDieWidth = toMM(formData.dieWidth);
       const isOutsource = formData.productionMethod === 'Outsource';
       const response = await axios.post('/api/quotes/save', { 
         ...formData, 
+        cartonLength: mmLength,
+        cartonWidth: mmWidth,
+        cartonHeight: mmHeight,
+        dieLength: mmDieLength,
+        dieWidth: mmDieWidth,
+        dimension_unit: dimUnit,
+        carton_length_input: String(formData.cartonLength || ''),
+        carton_width_input: String(formData.cartonWidth || ''),
+        carton_height_input: String(formData.cartonHeight || ''),
+        die_length_input: String(formData.dieLength || ''),
+        die_width_input: String(formData.dieWidth || ''),
         totalOverheadForOrder: isOutsource ? 0 : (formData.totalOverheadForOrder || 0),
         joiningCost: isOutsource ? 0 : formData.joiningCost,
         printCost: isOutsource ? 0 : formData.printCost,
@@ -916,11 +968,12 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
   // Ensure effective final cost per carton and invoice value consistently reflect Non-VAT (no added output tax)
   const isNonVatCustomer = (formData.taxType || calculatedCost?.tax?.tax_type || '').includes('Non-VAT');
-  const finalCostPerCarton = calculatedCost
+  const rawFinalCostPerCarton = calculatedCost
     ? (isNonVatCustomer
         ? ((calculatedCost.commissions?.cost_after_commissions ?? calculatedCost.profit?.cost_with_profit ?? 0) + (calculatedCost.transport?.transport_per_carton ?? 0))
         : parseFloat(calculatedCost.final?.final_cost_per_carton || 0))
     : 0;
+  const finalCostPerCarton = Math.round(rawFinalCostPerCarton * 4) / 4;
   const quantityNum = parseFloat(formData.quantity) || 1;
   const totalInvoiceValue = finalCostPerCarton * quantityNum;
   const totalBatchCost = totalInvoiceValue;
@@ -964,7 +1017,38 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
       {/* SECTION 1: CUSTOMER & DIMENSIONS */}
       <div className={`${cardClass} mb-6`}>
-        <h3 className={headingClass}>📦 Carton Specifications</h3>
+        <div className="flex flex-wrap items-center justify-between border-b pb-2 mb-4 border-gray-200 dark:border-slate-700">
+          <h3 className="text-lg font-bold flex items-center gap-2 m-0 p-0">
+            <span>📦</span> Carton Specifications
+          </h3>
+          <div className={`flex items-center gap-1 p-1 rounded-xl border text-xs font-bold ${
+            isDark ? 'bg-slate-800/80 border-slate-700' : isSand ? 'bg-[#faf8f5] border-[#dfd5bc]' : 'bg-[#ffffff]/90 border-[#bbf7d0]'
+          }`}>
+            <span className="text-[11px] px-1 opacity-70">Unit:</span>
+            <button
+              type="button"
+              onClick={() => handleUnitChange('mm')}
+              className={`px-3 py-1 rounded-lg transition-all cursor-pointer select-none text-xs font-bold ${
+                dimUnit === 'mm'
+                  ? isDark ? 'bg-[#d4af37] text-slate-950 font-black shadow-xs' : 'bg-emerald-700 text-white font-black shadow-xs'
+                  : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              mm
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUnitChange('inches')}
+              className={`px-3 py-1 rounded-lg transition-all cursor-pointer select-none text-xs font-bold ${
+                dimUnit === 'inches'
+                  ? isDark ? 'bg-[#d4af37] text-slate-950 font-black shadow-xs' : 'bg-emerald-700 text-white font-black shadow-xs'
+                  : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              inches
+            </button>
+          </div>
+        </div>
         
         <div className="mb-4">
           <label className={labelClass}>Customer Name</label>
@@ -1005,29 +1089,31 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
                 : 'bg-[#e2f0d9] border-[#bbf7d0] text-[#14532d]'
           }`}>
             <p className="text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span>✂️</span> Die Size (mm) — Direct Board Size
+              <span>✂️</span> Die Size ({dimUnit}) — Direct Board Size
             </p>
             <p className="text-xs opacity-80 mb-3">
               For {formData.cartonType}, the die dimensions below are directly used as the board sheet dimensions (Sheet Length & Sheet Width).
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Die Length (mm) [L]</label>
+                <label className={labelClass}>Die Length ({dimUnit}) [L]</label>
                 <input
                   type="number"
+                  step={dimUnit === 'inches' ? '0.01' : '1'}
                   name="dieLength"
-                  placeholder="Die Length (mm)"
+                  placeholder={dimUnit === 'inches' ? 'e.g. 15.50' : 'Die Length (mm)'}
                   value={formData.dieLength || ''}
                   onChange={handleInputChange}
                   className={inputClass}
                 />
               </div>
               <div>
-                <label className={labelClass}>Die Width (mm) [W]</label>
+                <label className={labelClass}>Die Width ({dimUnit}) [W]</label>
                 <input
                   type="number"
+                  step={dimUnit === 'inches' ? '0.01' : '1'}
                   name="dieWidth"
-                  placeholder="Die Width (mm)"
+                  placeholder={dimUnit === 'inches' ? 'e.g. 10.25' : 'Die Width (mm)'}
                   value={formData.dieWidth || ''}
                   onChange={handleInputChange}
                   className={inputClass}
@@ -1037,109 +1123,76 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           </div>
         )}
         
-        {/* Horizontal Sequential Spaces for L, W, H with Inches Input Selector */}
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-bold opacity-75">Dimensions Input Unit:</label>
-          <button
-            type="button"
-            onClick={() => setShowInches(!showInches)}
-            className={`text-xs px-3 py-1 rounded-xl border font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs ${
-              showInches
-                ? isDark 
-                  ? 'bg-[#d4af37] text-[#0f172a] border-[#d4af37]' 
-                  : isSand
-                    ? 'bg-[#8c734b] text-white border-[#8c734b]'
-                    : 'bg-emerald-700 text-white border-emerald-800 shadow-emerald-600/20'
-                : isDark 
-                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700' 
-                  : isSand
-                    ? 'bg-white hover:bg-[#faf8f5] text-[#5c4c36] border-[#dfd5bc]'
-                    : 'bg-white hover:bg-emerald-50 text-[#14532d] border-[#bbf7d0]'
-            }`}
-          >
-            <span>📐</span> {showInches ? '✓ Inches Input Active' : '📐 Select Inches Input (Auto × 25.4 → mm)'}
-          </button>
+        {/* Horizontal Sequential Spaces for L, W, H with Unit Click-Box Selector */}
+        <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
+          <label className={labelClass}>Carton Dimensions</label>
+          {/* Click box for mm / inches */}
+          <div className={`flex items-center gap-1 p-1 rounded-xl border text-xs font-bold ${
+            isDark ? 'bg-slate-800/80 border-slate-700' : isSand ? 'bg-[#faf8f5] border-[#dfd5bc]' : 'bg-[#eaf5ea] border-[#bbf7d0]'
+          }`}>
+            <span className="text-[11px] px-1 opacity-70">Unit:</span>
+            <button
+              type="button"
+              onClick={() => handleUnitChange('mm')}
+              className={`px-3 py-1 rounded-lg transition-all cursor-pointer select-none text-xs font-bold ${
+                dimUnit === 'mm'
+                  ? isDark ? 'bg-[#d4af37] text-slate-950 font-black shadow-xs' : 'bg-emerald-700 text-white font-black shadow-xs'
+                  : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              mm
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUnitChange('inches')}
+              className={`px-3 py-1 rounded-lg transition-all cursor-pointer select-none text-xs font-bold ${
+                dimUnit === 'inches'
+                  ? isDark ? 'bg-[#d4af37] text-slate-950 font-black shadow-xs' : 'bg-emerald-700 text-white font-black shadow-xs'
+                  : 'opacity-70 hover:opacity-100'
+              }`}
+            >
+              inches
+            </button>
+          </div>
         </div>
 
-        {/* 3 Square Slots for Inches Input */}
-        {showInches && (
-          <div className={`p-4 mb-4 rounded-2xl border transition-all ${
-            isDark 
-              ? 'bg-slate-800/70 border-blue-900/40 text-slate-200' 
-              : isSand
-                ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
-                : 'bg-[#e2f0d9] border-[#bbf7d0] text-[#14532d]'
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={`text-xs font-black tracking-wide flex items-center gap-1 ${
-                isDark ? 'text-[#d4af37]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'
-              }`}>
-                <span>📏</span> 3 SQUARE SLOTS: INCHES INPUT (auto-calculated as figure × 25.4 and filled to mm slots):
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className={labelClass}>Length (inches)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder='e.g. 12"'
-                  value={formData.cartonLength ? (parseFloat(formData.cartonLength) / 25.4).toFixed(2) : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const mm = val !== '' ? (parseFloat(val) * 25.4).toFixed(1) : '';
-                    setFormData(prev => ({ ...prev, cartonLength: mm }));
-                  }}
-                  className={`${inputClass} font-mono font-bold`}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Width (inches)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder='e.g. 10"'
-                  value={formData.cartonWidth ? (parseFloat(formData.cartonWidth) / 25.4).toFixed(2) : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const mm = val !== '' ? (parseFloat(val) * 25.4).toFixed(1) : '';
-                    setFormData(prev => ({ ...prev, cartonWidth: mm }));
-                  }}
-                  className={`${inputClass} font-mono font-bold`}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Height (inches)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder='e.g. 8"'
-                  value={formData.cartonHeight ? (parseFloat(formData.cartonHeight) / 25.4).toFixed(2) : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const mm = val !== '' ? (parseFloat(val) * 25.4).toFixed(1) : '';
-                    setFormData(prev => ({ ...prev, cartonHeight: mm }));
-                  }}
-                  className={`${inputClass} font-mono font-bold`}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Horizontal Sequential Spaces for L, W, H */}
+        {/* 3 Input Slots for L, W, H in Selected Unit */}
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div>
-            <label className={labelClass}>Carton Length (mm)</label>
-            <input type="number" name="cartonLength" placeholder="L" value={formData.cartonLength} onChange={handleInputChange} className={inputClass} />
+            <label className={labelClass}>Carton Length ({dimUnit})</label>
+            <input
+              type="number"
+              step={dimUnit === 'inches' ? '0.01' : '1'}
+              name="cartonLength"
+              placeholder={dimUnit === 'inches' ? 'e.g. 19.69' : 'L (mm)'}
+              value={formData.cartonLength}
+              onChange={handleInputChange}
+              className={inputClass}
+            />
           </div>
           <div>
-            <label className={labelClass}>Carton Width (mm)</label>
-            <input type="number" name="cartonWidth" placeholder="W" value={formData.cartonWidth} onChange={handleInputChange} className={inputClass} />
+            <label className={labelClass}>Carton Width ({dimUnit})</label>
+            <input
+              type="number"
+              step={dimUnit === 'inches' ? '0.01' : '1'}
+              name="cartonWidth"
+              placeholder={dimUnit === 'inches' ? 'e.g. 11.81' : 'W (mm)'}
+              value={formData.cartonWidth}
+              onChange={handleInputChange}
+              className={inputClass}
+            />
           </div>
           <div>
-            <label className={labelClass}>Carton Height (mm)</label>
-            <input type="number" name="cartonHeight" placeholder="H" value={formData.cartonHeight} onChange={handleInputChange} className={inputClass} />
+            <label className={labelClass}>Carton Height ({dimUnit})</label>
+            <input
+              type="number"
+              step={dimUnit === 'inches' ? '0.01' : '1'}
+              name="cartonHeight"
+              placeholder={dimUnit === 'inches' ? 'e.g. 7.87' : 'H (mm)'}
+              value={formData.cartonHeight}
+              onChange={handleInputChange}
+              className={inputClass}
+            />
           </div>
         </div>
 
@@ -1228,8 +1281,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <div>
             <label className={labelClass}>Board Type</label>
             <select name="boardType" value={formData.boardType} onChange={handleInputChange} className={selectClass}>
-              <option value="Browncut">Brown Liner</option>
-              <option value="Whitecut">White Liner</option>
+              <option value="Brown Liner">Brown Liner</option>
+              <option value="White Liner">White Liner</option>
             </select>
           </div>
         </div>
@@ -1279,19 +1332,19 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         <div className="flex justify-between items-center mb-4 border-b pb-2">
           <h3 className={`${headingClass} mb-0 border-b-0 pb-0`}>💰 Board Rate</h3>
           <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
-            {formData.boardType === 'Whitecut' 
+            {(formData.boardType === 'White Liner' || formData.boardType === 'Whitecut')
               ? `Auto: Rs. ${systemRates.whiteLinerRate || '285'}/kg (White Liner)`
               : `Auto: Rs. ${systemRates.brownLinerRate || '260'}/kg (Brown Liner)`}
           </span>
         </div>
         <div>
           <label className={labelClass}>
-            {formData.boardType === 'Whitecut' ? 'White Liner Rate (Rs./kg)' : 'Brown Liner Rate (Rs./kg)'}
+            {(formData.boardType === 'White Liner' || formData.boardType === 'Whitecut') ? 'White Liner Rate (Rs./kg)' : 'Brown Liner Rate (Rs./kg)'}
           </label>
           <input
             type="number"
             name={getActiveRateFieldName(formData.boardType)}
-            placeholder={formData.boardType === 'Whitecut' ? (systemRates.whiteLinerRate || '285.00') : (systemRates.brownLinerRate || '260.00')}
+            placeholder={(formData.boardType === 'White Liner' || formData.boardType === 'Whitecut') ? (systemRates.whiteLinerRate || '285.00') : (systemRates.brownLinerRate || '260.00')}
             value={formData[getActiveRateFieldName(formData.boardType)]}
             onChange={handleInputChange}
             className={inputClass}
@@ -1629,6 +1682,101 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               Transport Cost: Rs. {parseFloat(formData.transportCost || 0).toFixed(2)} / carton (Total for Order: Rs. {(parseFloat(formData.transportCost || 0) * (parseInt(formData.quantity) || 1)).toFixed(2)})
             </p>
           )}
+        </div>
+      </div>
+
+      {/* SECTION 8: SPECIAL ONE-TIME COSTS & PAYMENT TERMS */}
+      <div className={`${cardClass} mb-6`}>
+        <div className="flex flex-wrap items-center justify-between border-b pb-2 mb-4 border-gray-200 dark:border-slate-700">
+          <h3 className="text-lg font-bold flex items-center gap-2 m-0 p-0">
+            <span>🏷️</span> Special One-Time Costs (Optional)
+          </h3>
+          <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-900/50">
+            Quotation Line Items
+          </span>
+        </div>
+        <p className={`text-xs mb-4 ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
+          Enter one-time charges (if any). These will appear as separate itemized rows on the quotation without inflating per-carton unit cost.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Die Making Cost */}
+          <div className={`p-4 rounded-xl border ${
+            isDark ? 'bg-slate-700/30 border-slate-700 text-slate-200' : isSand ? 'bg-white border-[#dfd5bc] text-[#5c4c36]' : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'
+          }`}>
+            <label className={labelClass}>Die Making Cost (Rs.)</label>
+            <input
+              type="number"
+              name="oneTimeDieCost"
+              placeholder="e.g. 8500 (Optional)"
+              value={formData.oneTimeDieCost || ''}
+              onChange={handleInputChange}
+              className={inputClass}
+              min="0"
+              step="0.01"
+            />
+            <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1.5">For cutting die preparation</p>
+          </div>
+
+          {/* Block Making Cost */}
+          <div className={`p-4 rounded-xl border ${
+            isDark ? 'bg-slate-700/30 border-slate-700 text-slate-200' : isSand ? 'bg-white border-[#dfd5bc] text-[#5c4c36]' : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'
+          }`}>
+            <label className={labelClass}>Block Making Cost (Rs.)</label>
+            <input
+              type="number"
+              name="oneTimeBlockCost"
+              placeholder="e.g. 4500 (Optional)"
+              value={formData.oneTimeBlockCost || ''}
+              onChange={handleInputChange}
+              className={inputClass}
+              min="0"
+              step="0.01"
+            />
+            <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1.5">For printing block / stereo</p>
+          </div>
+
+          {/* One-Time Transport Cost */}
+          <div className={`p-4 rounded-xl border ${
+            isDark ? 'bg-slate-700/30 border-slate-700 text-slate-200' : isSand ? 'bg-white border-[#dfd5bc] text-[#5c4c36]' : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'
+          }`}>
+            <label className={labelClass}>Transport Cost (Rs. Fixed)</label>
+            <input
+              type="number"
+              name="oneTimeTransportCost"
+              placeholder="e.g. 5000 (Optional)"
+              value={formData.oneTimeTransportCost || ''}
+              onChange={handleInputChange}
+              className={inputClass}
+              min="0"
+              step="0.01"
+            />
+            <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1.5">Fixed lorry/delivery charge</p>
+          </div>
+        </div>
+
+        {/* Payment Method / Terms click-box */}
+        <div className="mt-5 pt-4 border-t border-gray-200 dark:border-slate-700">
+          <label className={labelClass}>Quotation Payment Method / Terms</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+            <select
+              name="paymentMethod"
+              value={formData.paymentMethod || 'Credit - 30 Days'}
+              onChange={handleInputChange}
+              className={inputClass}
+            >
+              <option value="Credit - 30 Days">Credit - 30 Days</option>
+              <option value="Credit - 60 Days">Credit - 60 Days</option>
+              <option value="Credit - 90 Days">Credit - 90 Days</option>
+              <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+              <option value="100% Advance Payment">100% Advance Payment</option>
+              <option value="50% Advance, Balance on Delivery">50% Advance, Balance on Delivery</option>
+              <option value="Payment within 7 Days">Payment within 7 Days</option>
+            </select>
+            <p className={`text-xs flex items-center ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+              Selected payment term will appear as a condition point on the official quotation sheet.
+            </p>
+          </div>
         </div>
       </div>
 

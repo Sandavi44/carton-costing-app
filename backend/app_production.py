@@ -119,6 +119,12 @@ class Quote(db.Model):
     carton_type = db.Column(db.String(50), default="RSC")  # RSC, Lock Type, Mail Type, Special Shape, S.F.
     die_length_mm = db.Column(db.Float, nullable=True, default=0.0)
     die_width_mm = db.Column(db.Float, nullable=True, default=0.0)
+    dimension_unit = db.Column(db.String(10), default='mm')  # 'mm' or 'inches'
+    carton_length_input = db.Column(db.String(50), nullable=True)
+    carton_width_input = db.Column(db.String(50), nullable=True)
+    carton_height_input = db.Column(db.String(50), nullable=True)
+    die_length_input = db.Column(db.String(50), nullable=True)
+    die_width_input = db.Column(db.String(50), nullable=True)
     ply_type = db.Column(db.String(20), nullable=False)
     board_type = db.Column(db.String(20), nullable=False)
     flute_type = db.Column(db.String(20), nullable=False)  # CORRECTED: added flute type
@@ -179,6 +185,12 @@ class Quote(db.Model):
     final_cost_per_carton = db.Column(db.Float)
     total_cost_batch = db.Column(db.Float)
     
+    # Special One-Time Costs & Payment Terms
+    die_making_cost = db.Column(db.Float, default=0.0)
+    block_making_cost = db.Column(db.Float, default=0.0)
+    one_time_transport_cost = db.Column(db.Float, default=0.0)
+    payment_method = db.Column(db.String(100), default="Credit - 30 Days")
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     quote_date = db.Column(db.Date, default=datetime.utcnow)
@@ -207,6 +219,16 @@ def ensure_db_columns_exist():
                 ("carton_type", "VARCHAR(50) DEFAULT 'RSC'"),
                 ("die_length_mm", "FLOAT DEFAULT 0.0"),
                 ("die_width_mm", "FLOAT DEFAULT 0.0"),
+                ("die_making_cost", "FLOAT DEFAULT 0.0"),
+                ("block_making_cost", "FLOAT DEFAULT 0.0"),
+                ("one_time_transport_cost", "FLOAT DEFAULT 0.0"),
+                ("payment_method", "VARCHAR(100) DEFAULT 'Credit - 30 Days'"),
+                ("dimension_unit", "VARCHAR(10) DEFAULT 'mm'"),
+                ("carton_length_input", "VARCHAR(50)"),
+                ("carton_width_input", "VARCHAR(50)"),
+                ("carton_height_input", "VARCHAR(50)"),
+                ("die_length_input", "VARCHAR(50)"),
+                ("die_width_input", "VARCHAR(50)"),
             ]
             for col_name, col_type in migration_cols:
                 for tbl in ["quote", "quotes"]:
@@ -358,28 +380,30 @@ def calculate_cost():
         brown_liner_param = SystemParameter.query.filter_by(parameter_name='brown_liner_board_rate').first()
         default_brown_liner = safe_float(brown_liner_param.value) if brown_liner_param else 260.0
 
-        board_type = data.get('board_type') or data.get('boardType') or 'Browncut'
+        raw_board_type = data.get('board_type') or data.get('boardType') or 'Brown Liner'
+        is_white_board = ('white' in raw_board_type.lower())
+        board_type = 'White Liner' if is_white_board else 'Brown Liner'
         req_white = safe_float(data.get('white_liner_rate', 0))
         req_brown = safe_float(data.get('brown_liner_rate', 0))
-        if board_type == 'Whitecut' and req_white <= 0:
+        if is_white_board and req_white <= 0:
             req_white = default_white_liner
-        elif board_type != 'Whitecut' and req_brown <= 0:
+        elif not is_white_board and req_brown <= 0:
             req_brown = default_brown_liner
 
         # Create parameters with corrected logic
         params = CostingParameters(
-            carton_length_mm=safe_float(data.get('carton_length_mm')),
-            carton_width_mm=safe_float(data.get('carton_width_mm')),
-            carton_height_mm=safe_float(data.get('carton_height_mm')),
+            carton_length_mm=round(safe_float(data.get('carton_length_mm'))),
+            carton_width_mm=round(safe_float(data.get('carton_width_mm'))),
+            carton_height_mm=round(safe_float(data.get('carton_height_mm'))),
             quantity=safe_int(data.get('quantity')),
             ply_type=data.get('ply_type'),
-            board_type=board_type,
+            board_type='Whitecut' if is_white_board else 'Browncut',
             flute_type=data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             flute_type_2=data.get('flute_type_2') or data.get('fluteType2') or data.get('flute_type') or data.get('fluteType', 'B-Flute'),
             production_method=prod_method,
             carton_type=data.get('carton_type') or data.get('cartonType', 'RSC'),
-            die_length_mm=safe_float(data.get('die_length_mm') or data.get('dieLength', 0)),
-            die_width_mm=safe_float(data.get('die_width_mm') or data.get('dieWidth', 0)),
+            die_length_mm=round(safe_float(data.get('die_length_mm') or data.get('dieLength', 0))),
+            die_width_mm=round(safe_float(data.get('die_width_mm') or data.get('dieWidth', 0))),
             inhouse_waste_percent=inhouse_waste_rate,
             outsource_waste_percent=outsource_waste_rate,
             joining_type=data.get('joining_type'),
@@ -449,18 +473,24 @@ def save_quote():
             user_id=user_id,
             customer_id=customer.id,
             customer_name=data.get('customerName'),
-            carton_length_mm=safe_float(data.get('cartonLength')),
-            carton_width_mm=safe_float(data.get('cartonWidth')),
-            carton_height_mm=safe_float(data.get('cartonHeight')),
+            carton_length_mm=round(safe_float(data.get('cartonLength'))),
+            carton_width_mm=round(safe_float(data.get('cartonWidth'))),
+            carton_height_mm=round(safe_float(data.get('cartonHeight'))),
+            dimension_unit=data.get('dimension_unit') or data.get('dimensionUnit') or 'mm',
+            carton_length_input=str(data.get('carton_length_input') or data.get('cartonLengthInput') or ''),
+            carton_width_input=str(data.get('carton_width_input') or data.get('cartonWidthInput') or ''),
+            carton_height_input=str(data.get('carton_height_input') or data.get('cartonHeightInput') or ''),
+            die_length_input=str(data.get('die_length_input') or data.get('dieLengthInput') or ''),
+            die_width_input=str(data.get('die_width_input') or data.get('dieWidthInput') or ''),
             quantity=quantity,
             ply_type=data.get('plyType'),
-            board_type=data.get('boardType'),
+            board_type='White Liner' if 'white' in str(data.get('boardType') or data.get('board_type') or '').lower() else 'Brown Liner',
             flute_type=data.get('fluteType') or data.get('flute_type', 'B-Flute'),
             flute_type_2=data.get('fluteType2') or data.get('flute_type_2') or data.get('fluteType') or data.get('flute_type', 'B-Flute'),
             production_method=production_method,
             carton_type=data.get('cartonType') or data.get('carton_type', 'RSC'),
-            die_length_mm=safe_float(data.get('dieLength') or data.get('die_length_mm', 0)),
-            die_width_mm=safe_float(data.get('dieWidth') or data.get('die_width_mm', 0)),
+            die_length_mm=round(safe_float(data.get('dieLength') or data.get('die_length_mm', 0))),
+            die_width_mm=round(safe_float(data.get('dieWidth') or data.get('die_width_mm', 0))),
             joining_type=data.get('joiningType'),
             is_printed=data.get('isPrinted', False),
             gsm_values=json.dumps(gsm_values),
@@ -483,6 +513,10 @@ def save_quote():
             third_party_commission=safe_float(data.get('thirdPartyCommission', 0)),
             has_transport=data.get('hasTransport', False),
             transport_cost=safe_float(data.get('transportCost', 0)),
+            die_making_cost=safe_float(data.get('oneTimeDieCost') or data.get('die_making_cost') or 0),
+            block_making_cost=safe_float(data.get('oneTimeBlockCost') or data.get('block_making_cost') or 0),
+            one_time_transport_cost=safe_float(data.get('oneTimeTransportCost') or data.get('one_time_transport_cost') or 0),
+            payment_method=data.get('paymentMethod') or data.get('payment_method') or "Credit - 30 Days",
         )
         
         # Add calculated costs if provided
@@ -525,15 +559,43 @@ def get_quote_history():
         
         result = []
         for quote in quotes:
+            dim_unit = getattr(quote, 'dimension_unit', 'mm') or 'mm'
+            l_in = getattr(quote, 'carton_length_input', None)
+            w_in = getattr(quote, 'carton_width_input', None)
+            h_in = getattr(quote, 'carton_height_input', None)
+            c_l = round(quote.carton_length_mm) if quote.carton_length_mm else 0
+            c_w = round(quote.carton_width_mm) if quote.carton_width_mm else 0
+            c_h = round(quote.carton_height_mm) if quote.carton_height_mm else 0
+            if dim_unit == 'inches' and l_in and w_in and h_in:
+                dim_display = f"{l_in}×{w_in}×{h_in} inches"
+            else:
+                dim_display = f"{c_l}×{c_w}×{c_h} mm"
+
             result.append({
                 'id': quote.id,
                 'quote_no': f"QT-{str(quote.id).zfill(5)}",
                 'customer_name': quote.customer_name,
-                'dimensions': f"{quote.carton_length_mm}×{quote.carton_width_mm}×{quote.carton_height_mm}",
+                'dimensions': dim_display,
+                'dimension_unit': dim_unit,
+                'carton_length_input': l_in,
+                'carton_width_input': w_in,
+                'carton_height_input': h_in,
+                'die_length_input': getattr(quote, 'die_length_input', None),
+                'die_width_input': getattr(quote, 'die_width_input', None),
+                'carton_length_mm': c_l,
+                'carton_width_mm': c_w,
+                'carton_height_mm': c_h,
                 'ply_type': quote.ply_type,
                 'carton_type': getattr(quote, 'carton_type', 'RSC') or 'RSC',
-                'die_length_mm': getattr(quote, 'die_length_mm', 0.0) or 0.0,
-                'die_width_mm': getattr(quote, 'die_width_mm', 0.0) or 0.0,
+                'die_length_mm': round(getattr(quote, 'die_length_mm', 0.0) or 0.0),
+                'die_width_mm': round(getattr(quote, 'die_width_mm', 0.0) or 0.0),
+                'board_type': quote.board_type,
+                'flute_type': quote.flute_type,
+                'flute_type_2': getattr(quote, 'flute_type_2', None) or quote.flute_type,
+                'die_making_cost': getattr(quote, 'die_making_cost', 0.0) or 0.0,
+                'block_making_cost': getattr(quote, 'block_making_cost', 0.0) or 0.0,
+                'one_time_transport_cost': getattr(quote, 'one_time_transport_cost', 0.0) or 0.0,
+                'payment_method': getattr(quote, 'payment_method', 'Credit - 30 Days') or 'Credit - 30 Days',
                 'quantity': quote.quantity,
                 'tax_type': quote.tax_type,
                 'final_cost_per_carton': quote.final_cost_per_carton,
@@ -562,9 +624,15 @@ def get_quote(quote_id):
             'quote_no': f"QT-{str(quote.id).zfill(5)}",
             'customer_name': quote.customer_name,
             'created_at': quote.created_at.strftime('%d/%m/%Y') if quote.created_at else datetime.utcnow().strftime('%d/%m/%Y'),
-            'carton_length_mm': quote.carton_length_mm,
-            'carton_width_mm': quote.carton_width_mm,
-            'carton_height_mm': quote.carton_height_mm,
+            'dimension_unit': getattr(quote, 'dimension_unit', 'mm') or 'mm',
+            'carton_length_input': getattr(quote, 'carton_length_input', None),
+            'carton_width_input': getattr(quote, 'carton_width_input', None),
+            'carton_height_input': getattr(quote, 'carton_height_input', None),
+            'die_length_input': getattr(quote, 'die_length_input', None),
+            'die_width_input': getattr(quote, 'die_width_input', None),
+            'carton_length_mm': round(quote.carton_length_mm) if quote.carton_length_mm else 0,
+            'carton_width_mm': round(quote.carton_width_mm) if quote.carton_width_mm else 0,
+            'carton_height_mm': round(quote.carton_height_mm) if quote.carton_height_mm else 0,
             'quantity': quote.quantity,
             'ply_type': quote.ply_type,
             'board_type': quote.board_type,
@@ -572,8 +640,8 @@ def get_quote(quote_id):
             'flute_type_2': getattr(quote, 'flute_type_2', None) or quote.flute_type,
             'production_method': getattr(quote, 'production_method', 'In-house') or 'In-house',
             'carton_type': getattr(quote, 'carton_type', 'RSC') or 'RSC',
-            'die_length_mm': getattr(quote, 'die_length_mm', 0.0) or 0.0,
-            'die_width_mm': getattr(quote, 'die_width_mm', 0.0) or 0.0,
+            'die_length_mm': round(getattr(quote, 'die_length_mm', 0.0) or 0.0),
+            'die_width_mm': round(getattr(quote, 'die_width_mm', 0.0) or 0.0),
             'joining_type': quote.joining_type,
             'is_printed': quote.is_printed,
             'gsm_values': json.loads(quote.gsm_values) if quote.gsm_values else [],
@@ -595,14 +663,18 @@ def get_quote(quote_id):
             'third_party_commission': quote.third_party_commission,
             'has_transport': quote.has_transport,
             'transport_cost': quote.transport_cost,
+            'die_making_cost': getattr(quote, 'die_making_cost', 0.0) or 0.0,
+            'block_making_cost': getattr(quote, 'block_making_cost', 0.0) or 0.0,
+            'one_time_transport_cost': getattr(quote, 'one_time_transport_cost', 0.0) or 0.0,
+            'payment_method': getattr(quote, 'payment_method', 'Credit - 30 Days') or 'Credit - 30 Days',
             'rm_cost_per_carton': quote.rm_cost_per_carton,
             'profit_per_carton': quote.profit_per_carton,
             'tax_amount_per_carton': quote.tax_amount_per_carton,
             'subtotal_per_carton': quote.subtotal_per_carton,
             'dimensions': {
-                'length_mm': quote.carton_length_mm,
-                'width_mm': quote.carton_width_mm,
-                'height_mm': quote.carton_height_mm
+                'length_mm': round(quote.carton_length_mm) if quote.carton_length_mm else 0,
+                'width_mm': round(quote.carton_width_mm) if quote.carton_width_mm else 0,
+                'height_mm': round(quote.carton_height_mm) if quote.carton_height_mm else 0
             },
             'sheet_dimensions': {
                 'sheet_length_mm': quote.sheet_length_mm,
@@ -861,8 +933,18 @@ def init_db():
     with app.app_context():
         db.create_all()
         
-        # Ensure flute_type_2 and production_method columns exist in quote table
-        for col_name, col_type in [("flute_type_2", "VARCHAR(20)"), ("production_method", "VARCHAR(20) DEFAULT 'In-house'")]:
+        # Ensure newly added columns exist in quote table
+        for col_name, col_type in [
+            ("flute_type_2", "VARCHAR(20)"),
+            ("production_method", "VARCHAR(20) DEFAULT 'In-house'"),
+            ("carton_type", "VARCHAR(50) DEFAULT 'RSC'"),
+            ("die_length_mm", "FLOAT DEFAULT 0.0"),
+            ("die_width_mm", "FLOAT DEFAULT 0.0"),
+            ("die_making_cost", "FLOAT DEFAULT 0.0"),
+            ("block_making_cost", "FLOAT DEFAULT 0.0"),
+            ("one_time_transport_cost", "FLOAT DEFAULT 0.0"),
+            ("payment_method", "VARCHAR(100) DEFAULT 'Credit - 30 Days'"),
+        ]:
             for tbl in ["quote", "quotes"]:
                 try:
                     with db.engine.connect() as conn:

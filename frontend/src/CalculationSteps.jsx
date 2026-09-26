@@ -26,10 +26,14 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
     );
   }
 
-  // Helper variables for equations
-  const L = parseFloat(formData.cartonLength || 0);
-  const W = parseFloat(formData.cartonWidth || 0);
-  const H = parseFloat(formData.cartonHeight || 0);
+  const isInch = formData.dimensionUnit === 'inches';
+  const toMM = (v) => {
+    if (!v || isNaN(v)) return 0;
+    return isInch ? Math.round(parseFloat(v) * 25.4) : Math.round(parseFloat(v));
+  };
+  const L = calculatedCost?.dimensions?.carton_length_mm != null ? calculatedCost.dimensions.carton_length_mm : toMM(formData.cartonLength);
+  const W = calculatedCost?.dimensions?.carton_width_mm != null ? calculatedCost.dimensions.carton_width_mm : toMM(formData.cartonWidth);
+  const H = calculatedCost?.dimensions?.carton_height_mm != null ? calculatedCost.dimensions.carton_height_mm : toMM(formData.cartonHeight);
   const Qty = parseInt(formData.quantity || 1);
   const ply = formData.plyType;
   const boardType = formData.boardType;
@@ -49,8 +53,12 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const g5 = parseFloat(formData.gsm5) || 0;
 
   const cartonType = formData.cartonType || calculatedCost.dimensions?.carton_type || 'RSC';
-  const dieLength = parseFloat(formData.dieLength || calculatedCost.dimensions?.die_length_mm || 0);
-  const dieWidth = parseFloat(formData.dieWidth || calculatedCost.dimensions?.die_width_mm || 0);
+  const dieLength = calculatedCost?.dimensions?.die_length_mm != null && calculatedCost.dimensions.die_length_mm > 0
+    ? calculatedCost.dimensions.die_length_mm 
+    : toMM(formData.dieLength);
+  const dieWidth = calculatedCost?.dimensions?.die_width_mm != null && calculatedCost.dimensions.die_width_mm > 0
+    ? calculatedCost.dimensions.die_width_mm 
+    : toMM(formData.dieWidth);
   const isDieCut = cartonType !== 'RSC';
   const isTwoUp = calculatedCost.sheet_dimensions?.is_two_up || (cartonType === 'RSC' && (((L + W) * 2 + ((ply === '2-Ply' || ply === '3-Ply') ? 62 : 75)) > 1938));
 
@@ -173,6 +181,11 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                   isDark ? 'bg-purple-950/40 text-purple-200 border-purple-800/40' : 'bg-purple-50 text-purple-900 border-purple-200'
                 }`}>
                   ✂️ <strong>Carton Type: {cartonType}</strong> — Die-cut carton dimensions are applied directly to board/sheet size.
+                  {isInch && formData.dieLength && formData.dieWidth && (
+                    <div className="mt-1 font-mono text-[11px] opacity-90">
+                      Input in inches: {formData.dieLength}" × {formData.dieWidth}" → Converted to {dieLength} mm × {dieWidth} mm
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-semibold">1. Sheet Length Calculation</p>
@@ -195,6 +208,13 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
               </>
             ) : (
               <>
+                {isInch && formData.cartonLength && formData.cartonWidth && (
+                  <div className={`p-2.5 rounded-xl mb-3 text-xs font-medium border ${
+                    isDark ? 'bg-blue-950/40 text-blue-200 border-blue-800/40' : 'bg-blue-50 text-blue-900 border-blue-200'
+                  }`}>
+                    📐 Dimensions entered in inches: {formData.cartonLength}" × {formData.cartonWidth}" × {formData.cartonHeight}" → Converted to {L} mm × {W} mm × {H} mm for calculation.
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-semibold">1. Sheet Length Calculation</p>
                   <div className={solveBoxClass}>

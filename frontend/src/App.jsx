@@ -24,7 +24,7 @@ function App() {
     cartonHeight: '',
     quantity: '',
     plyType: '3-Ply',
-    boardType: 'Browncut',
+    boardType: 'Brown Liner',
     fluteType: 'B-Flute',
     fluteType2: 'B-Flute',
     joiningType: 'Glued',
@@ -62,6 +62,11 @@ function App() {
     thirdPartyCommission: '',
     hasTransport: false,
     transportCost: '',
+    oneTimeDieCost: '',
+    oneTimeBlockCost: '',
+    oneTimeTransportCost: '',
+    paymentMethod: 'Credit - 30 Days',
+    dimensionUnit: 'mm',
   });
   const [calculatedCost, setCalculatedCost] = useState(null);
   const getInitialTheme = () => {

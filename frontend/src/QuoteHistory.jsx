@@ -104,7 +104,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         cartonHeight: quote.carton_height_mm || '',
         quantity: quote.quantity || '',
         plyType: quote.ply_type || '3-Ply',
-        boardType: quote.board_type || 'Whitecut',
+        boardType: (quote.board_type && quote.board_type.toLowerCase().includes('white')) ? 'White Liner' : 'Brown Liner',
         fluteType: quote.flute_type || 'B-Flute',
         fluteType2: quote.flute_type_2 || quote.flute_type || 'B-Flute',
         productionMethod: quote.production_method || 'In-house',
@@ -115,8 +115,8 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         isEditing: true,
         joiningType: quote.joining_type || 'Glued',
         isPrinted: quote.is_printed || false,
-        whiteLinerRate: quote.board_type === 'Whitecut' ? (quote.white_liner_rate || '') : '',
-        brownLinerRate: quote.board_type !== 'Whitecut' ? (quote.brown_liner_rate || '') : '',
+        whiteLinerRate: (quote.board_type && quote.board_type.toLowerCase().includes('white')) ? (quote.white_liner_rate || '') : '',
+        brownLinerRate: (!quote.board_type || !quote.board_type.toLowerCase().includes('white')) ? (quote.brown_liner_rate || '') : '',
         gsm1: gsmArray[0] !== undefined ? gsmArray[0].toString() : '',
         gsm2: gsmArray[1] !== undefined ? gsmArray[1].toString() : '',
         gsm3: gsmArray[2] !== undefined ? gsmArray[2].toString() : '',
@@ -546,9 +546,19 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         const isVatCustomer = reportTaxFormat === 'vat' || 
           (reportTaxFormat === 'auto' && (!selectedQuote.tax_type || !selectedQuote.tax_type.includes('Non-VAT')));
 
-        const unitPrice = parseFloat(selectedQuote.final_cost_per_carton || 0);
+        // Unit price rounded off to nearest 25 cents (0.25)
+        const rawUnitPrice = parseFloat(selectedQuote.final_cost_per_carton || 0);
+        const unitPrice = Math.round(rawUnitPrice * 4) / 4;
         const qty = parseInt(selectedQuote.quantity || 0, 10);
-        const subtotalAmount = unitPrice * qty;
+        const cartonAmount = unitPrice * qty;
+
+        // Special One-Time Costs
+        const dieCost = parseFloat(selectedQuote.die_making_cost || 0);
+        const blockCost = parseFloat(selectedQuote.block_making_cost || 0);
+        const oneTimeTransport = parseFloat(selectedQuote.one_time_transport_cost || 0);
+
+        // Subtotal is sum of carton order amount + any optional one-time charges
+        const subtotalAmount = cartonAmount + dieCost + blockCost + oneTimeTransport;
         const vatAmount = subtotalAmount * 0.18;
         const totalAmount = isVatCustomer ? (subtotalAmount + vatAmount) : subtotalAmount;
 
@@ -564,16 +574,52 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
           }
         })();
 
-        const dimStr = selectedQuote.dimensions && typeof selectedQuote.dimensions === 'object'
-          ? `${selectedQuote.dimensions.length_mm}x${selectedQuote.dimensions.width_mm}x${selectedQuote.dimensions.height_mm} mm`
-          : (selectedQuote.carton_length_mm 
-              ? `${selectedQuote.carton_length_mm}x${selectedQuote.carton_width_mm}x${selectedQuote.carton_height_mm} mm` 
-              : `${selectedQuote.dimensions || ''} mm`);
+        const dimUnit = selectedQuote.dimension_unit || 'mm';
+        const hasInputs = selectedQuote.carton_length_input && selectedQuote.carton_width_input && selectedQuote.carton_height_input;
+
+        let dimStr;
+        if (dimUnit === 'inches') {
+          if (hasInputs) {
+            dimStr = `${selectedQuote.carton_length_input}×${selectedQuote.carton_width_input}×${selectedQuote.carton_height_input} inches`;
+          } else {
+            const lIn = (selectedQuote.carton_length_mm / 25.4).toFixed(2).replace(/\.00$/, '');
+            const wIn = (selectedQuote.carton_width_mm / 25.4).toFixed(2).replace(/\.00$/, '');
+            const hIn = (selectedQuote.carton_height_mm / 25.4).toFixed(2).replace(/\.00$/, '');
+            dimStr = `${lIn}×${wIn}×${hIn} inches`;
+          }
+        } else {
+          const lMm = Math.round(selectedQuote.carton_length_mm || selectedQuote.dimensions?.length_mm || 0);
+          const wMm = Math.round(selectedQuote.carton_width_mm || selectedQuote.dimensions?.width_mm || 0);
+          const hMm = Math.round(selectedQuote.carton_height_mm || selectedQuote.dimensions?.height_mm || 0);
+          dimStr = `${lMm}×${wMm}×${hMm} mm`;
+        }
 
         const plyStr = selectedQuote.ply_type ? `${selectedQuote.ply_type.replace('-', ' ')} Carton` : 'Carton';
         const typeStr = selectedQuote.carton_type ? `${selectedQuote.carton_type} Type` : 'RSC Type';
         const descStr = `${dimStr} - ${plyStr} - ${typeStr}`;
         const displayQuoteNo = selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`;
+
+        // Flute and Board Formatting (no flute factor)
+        const formatFluteName = (f) => {
+          if (!f) return '';
+          return f.replace(/-Flute/i, ' flute').replace(/Flute/i, 'flute');
+        };
+        const fluteDisplay = (() => {
+          const f1 = formatFluteName(selectedQuote.flute_type);
+          const f2 = selectedQuote.ply_type === '5-Ply' && selectedQuote.flute_type_2 && selectedQuote.flute_type_2 !== selectedQuote.flute_type
+            ? formatFluteName(selectedQuote.flute_type_2)
+            : null;
+          return f2 ? `${f1} / ${f2}` : (f1 || 'B flute');
+        })();
+        // Board Formatting
+        const formatBoardName = (b) => {
+          if (!b) return 'Brown Liner';
+          if (b.toLowerCase().includes('white')) return 'White Liner';
+          if (b.toLowerCase().includes('brown')) return 'Brown Liner';
+          return b;
+        };
+        const boardDisplay = formatBoardName(selectedQuote.board_type);
+        const paymentMethodDisplay = selectedQuote.payment_method || 'Credit - 30 Days';
 
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
@@ -792,29 +838,98 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className="border-b border-gray-200 hover:bg-gray-50/50">
-                            <td className="py-3 px-3 text-center font-medium text-gray-600 border-r border-gray-300">1</td>
-                            <td className="py-3 px-4 font-semibold text-gray-900 border-r border-gray-300">
-                              <div>{descStr}</div>
-                              {selectedQuote.carton_type && selectedQuote.carton_type !== 'RSC' && selectedQuote.die_length_mm && selectedQuote.die_width_mm ? (
-                                <div className="text-[11px] text-gray-500 font-normal mt-0.5">
-                                  Die Size: {selectedQuote.die_length_mm} × {selectedQuote.die_width_mm} mm
-                                </div>
-                              ) : null}
-                            </td>
-                            <td className="py-3 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">
-                              {qty.toLocaleString()}
-                            </td>
-                            <td className="py-3 px-3 text-center text-gray-700 border-r border-gray-300">
-                              Nos
-                            </td>
-                            <td className="py-3 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
-                              {unitPrice.toFixed(2)}
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">
-                              {subtotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                          </tr>
+                          {(() => {
+                            let sNo = 1;
+                            return (
+                              <>
+                                <tr className="border-b border-gray-200 hover:bg-gray-50/50">
+                                  <td className="py-3 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{sNo}</td>
+                                  <td className="py-3 px-4 font-semibold text-gray-900 border-r border-gray-300">
+                                    <div>{descStr}</div>
+                                    <div className="text-[11px] text-gray-600 font-normal mt-1 space-y-0.5">
+                                      <div><span className="font-semibold text-gray-700">Flute Type:</span> {fluteDisplay}</div>
+                                      <div><span className="font-semibold text-gray-700">Board Type:</span> {boardDisplay}</div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">
+                                    {qty.toLocaleString()}
+                                  </td>
+                                  <td className="py-3 px-3 text-center text-gray-700 border-r border-gray-300">
+                                    Nos
+                                  </td>
+                                  <td className="py-3 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
+                                    {unitPrice.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">
+                                    {cartonAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+
+                                {dieCost > 0 && (() => {
+                                  sNo++;
+                                  return (
+                                    <tr className="border-b border-gray-200 hover:bg-gray-50/50">
+                                      <td className="py-2.5 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{sNo}</td>
+                                      <td className="py-2.5 px-4 font-semibold text-gray-900 border-r border-gray-300">
+                                        <div>Die Making Cost</div>
+                                        <div className="text-[11px] text-gray-500 font-normal">As a One time cost</div>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">1</td>
+                                      <td className="py-2.5 px-3 text-center text-gray-700 border-r border-gray-300">Nos</td>
+                                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
+                                        {dieCost.toFixed(2)}
+                                      </td>
+                                      <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900">
+                                        {dieCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  );
+                                })()}
+
+                                {blockCost > 0 && (() => {
+                                  sNo++;
+                                  return (
+                                    <tr className="border-b border-gray-200 hover:bg-gray-50/50">
+                                      <td className="py-2.5 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{sNo}</td>
+                                      <td className="py-2.5 px-4 font-semibold text-gray-900 border-r border-gray-300">
+                                        <div>Block Making Cost</div>
+                                        <div className="text-[11px] text-gray-500 font-normal">As a One time cost</div>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">1</td>
+                                      <td className="py-2.5 px-3 text-center text-gray-700 border-r border-gray-300">Nos</td>
+                                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
+                                        {blockCost.toFixed(2)}
+                                      </td>
+                                      <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900">
+                                        {blockCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  );
+                                })()}
+
+                                {oneTimeTransport > 0 && (() => {
+                                  sNo++;
+                                  return (
+                                    <tr className="border-b border-gray-200 hover:bg-gray-50/50">
+                                      <td className="py-2.5 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{sNo}</td>
+                                      <td className="py-2.5 px-4 font-semibold text-gray-900 border-r border-gray-300">
+                                        <div>Transport Cost</div>
+                                        <div className="text-[11px] text-gray-500 font-normal">Fixed order delivery transport charge</div>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">1</td>
+                                      <td className="py-2.5 px-3 text-center text-gray-700 border-r border-gray-300">Trip</td>
+                                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
+                                        {oneTimeTransport.toFixed(2)}
+                                      </td>
+                                      <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900">
+                                        {oneTimeTransport.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </td>
+                                    </tr>
+                                  );
+                                })()}
+                              </>
+                            );
+                          })()}
                         </tbody>
                       </table>
                     </div>
@@ -856,34 +971,111 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   </div>
 
                   {/* Document Footer Notes & Signatures */}
-                  <div className="mt-10 pt-6 border-t border-gray-200 text-xs text-gray-500 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
-                    <div>
-                      <p className="font-semibold text-gray-700">
+                  <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-600 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
+                    <div className="space-y-2">
+                      <p className="font-bold text-gray-800 text-sm">
                         {isVatCustomer ? 'Chelsy Packaging Solutions (Pvt) Ltd.' : 'Chelsy Packaging Pvt Ltd'}
                       </p>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Thank you for your business. Quotation validity: 14 days.</p>
+                      
+                      {/* Special Conditions / Terms */}
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 max-w-md space-y-1">
+                        <p className="font-bold text-gray-700 text-[11px] uppercase tracking-wider mb-1">Terms & Conditions:</p>
+                        <p className="text-xs text-black flex items-start gap-1.5 font-bold">
+                          <span className="font-black text-black">1. Payment Method:</span>
+                          <span className="font-black text-black">{paymentMethodDisplay}</span>
+                        </p>
+                        <p className="text-[11px] text-gray-600 flex items-start gap-1.5">
+                          <span className="font-semibold text-gray-700">2. Quotation Validity:</span>
+                          <span className="font-normal text-gray-700">14 days from quote date.</span>
+                        </p>
+                        <p className="text-[11px] text-gray-600 flex items-start gap-1.5">
+                          <span className="font-semibold text-gray-700">3. Delivery Timeline:</span>
+                          <span className="font-normal text-gray-700">7-10 working days upon confirmed Purchase Order.</span>
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-left sm:text-right">
-                      <div className="w-48 border-b border-gray-400 mb-1"></div>
-                      <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Authorized Signature</p>
+
+                    {/* Right Column: Bank Account Details (Marked Area) + Authorized Signature */}
+                    <div className="flex flex-col items-start sm:items-end justify-between gap-4 w-full sm:w-auto">
+                      {/* Bank Account Details Box */}
+                      <div className="bg-gray-50 border border-gray-300 rounded-xl p-2.5 sm:p-3 text-left w-full sm:w-64 text-[11px] shadow-xs">
+                        <p className="font-bold text-gray-800 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1 border-b border-gray-200 pb-1">
+                          <span>🏦</span> Bank Account Details
+                        </p>
+                        {isVatCustomer ? (
+                          <div className="space-y-0.5 text-gray-800 text-[11px]">
+                            <p className="flex justify-between gap-2">
+                              <span className="font-semibold text-gray-700">A/C No:</span>
+                              <span className="font-mono font-bold text-black text-xs">0110-13429295-001</span>
+                            </p>
+                            <p className="flex justify-between gap-2">
+                              <span className="font-semibold text-gray-700">A/C Name:</span>
+                              <span className="font-medium text-gray-900 text-right">Chelsy Packaging Solutions Pvt Ltd</span>
+                            </p>
+                            <p className="flex justify-between gap-2">
+                              <span className="font-semibold text-gray-700">Bank / Branch:</span>
+                              <span className="font-medium text-gray-900 text-right">Seylan Bank - Gampaha</span>
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5 text-gray-800 text-[11px]">
+                            <p className="flex justify-between gap-2">
+                              <span className="font-semibold text-gray-700">A/C No:</span>
+                              <span className="font-mono font-bold text-black text-xs">1000448465</span>
+                            </p>
+                            <p className="flex justify-between gap-2">
+                              <span className="font-semibold text-gray-700">A/C Name:</span>
+                              <span className="font-medium text-gray-900 text-right">Chelsy Packaging Pvt Ltd.</span>
+                            </p>
+                            <p className="flex justify-between gap-2">
+                              <span className="font-semibold text-gray-700">Bank / Branch:</span>
+                              <span className="font-medium text-gray-900 text-right">Commercial Bank, Weliweriya branch</span>
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Signature line */}
+                      <div className="text-left sm:text-right w-full sm:w-auto pt-1">
+                        <div className="w-48 sm:ml-auto border-b border-gray-400 mb-1"></div>
+                        <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Authorized Signature</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Modal Action Buttons: Delete Quote, Print Quotation, Close */}
-              <div className="no-print-zone mt-4 pt-3 border-t border-gray-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-2.5 shrink-0">
+              {/* Modal Action Buttons: Delete Quote, Save as PDF, Print Quotation, Close */}
+              <div className="no-print-zone mt-4 pt-3 border-t border-gray-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no)}
-                  className="font-bold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 text-sm shadow-xs flex items-center justify-center gap-1.5"
+                  className="font-bold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5"
                 >
                   <span>🗑️</span> Delete Quote
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-white bg-blue-600 hover:bg-blue-700 border-blue-700 shadow-md text-sm flex items-center justify-center gap-1.5 hover:scale-[1.01]"
+                  onClick={() => {
+                    const prevTitle = document.title;
+                    document.title = `Quotation_${displayQuoteNo}_${(selectedQuote.customer_name || 'Customer').replace(/\s+/g, '_')}`;
+                    window.print();
+                    setTimeout(() => { document.title = prevTitle; }, 1000);
+                  }}
+                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-700 shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:scale-[1.01]"
+                  title="Save or download as PDF document"
+                >
+                  <span>📥</span> Save as PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prevTitle = document.title;
+                    document.title = `Quotation_${displayQuoteNo}_${(selectedQuote.customer_name || 'Customer').replace(/\s+/g, '_')}`;
+                    window.print();
+                    setTimeout(() => { document.title = prevTitle; }, 1000);
+                  }}
+                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-white bg-blue-600 hover:bg-blue-700 border-blue-700 shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:scale-[1.01]"
                 >
                   <span>🖨️</span> Print Quotation
                 </button>
@@ -894,7 +1086,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                     backgroundColor: isDark ? '#1a2332' : '#2d2417',
                     color: '#ffffff'
                   }}
-                  className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-sm text-white flex items-center justify-center"
+                  className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-xs sm:text-sm text-white flex items-center justify-center"
                 >
                   Close
                 </button>
