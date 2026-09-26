@@ -38,9 +38,50 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
     }
   };
 
+  const [companyBanking, setCompanyBanking] = useState(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const fetchBankingDetails = async () => {
+    try {
+      const response = await axios.get('/api/company/banking-details', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      setCompanyBanking(response.data);
+    } catch (err) {
+      console.warn('Banking details restricted to authenticated internal users:', err);
+    }
+  };
+
   useEffect(() => {
     fetchHistory();
+    fetchBankingDetails();
   }, []);
+
+  const handleDownloadSecurePdf = async (quoteId, taxFormat, displayQuoteNo) => {
+    setPdfLoading(true);
+    try {
+      const response = await axios.post(
+        `/api/quotes/${quoteId}/pdf-ticket`,
+        { tax_format: taxFormat },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } }
+      );
+      if (response.data && response.data.download_url) {
+        const downloadLink = document.createElement('a');
+        downloadLink.href = response.data.download_url;
+        downloadLink.setAttribute('download', `Quotation_${displayQuoteNo}.pdf`);
+        downloadLink.target = '_blank';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      } else {
+        throw new Error('No download URL returned by server');
+      }
+    } catch (err) {
+      alert('Failed to generate secure PDF: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   const [successMsg, setSuccessMsg] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -997,43 +1038,38 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
 
                     {/* Right Column: Bank Account Details (Marked Area) + Authorized Signature */}
                     <div className="flex flex-col items-start sm:items-end justify-between gap-4 w-full sm:w-auto">
-                      {/* Bank Account Details Box */}
-                      <div className="bg-gray-50 border border-gray-300 rounded-xl p-2.5 sm:p-3 text-left w-full sm:w-64 text-[11px] shadow-xs">
-                        <p className="font-bold text-gray-800 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1 border-b border-gray-200 pb-1">
-                          <span>🏦</span> Bank Account Details
-                        </p>
-                        {isVatCustomer ? (
-                          <div className="space-y-0.5 text-gray-800 text-[11px]">
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">A/C No:</span>
-                              <span className="font-mono font-bold text-black text-xs">0110-13429295-001</span>
-                            </p>
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">A/C Name:</span>
-                              <span className="font-medium text-gray-900 text-right">Chelsy Packaging Solutions Pvt Ltd</span>
-                            </p>
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">Bank / Branch:</span>
-                              <span className="font-medium text-gray-900 text-right">Seylan Bank - Gampaha</span>
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-0.5 text-gray-800 text-[11px]">
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">A/C No:</span>
-                              <span className="font-mono font-bold text-black text-xs">1000448465</span>
-                            </p>
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">A/C Name:</span>
-                              <span className="font-medium text-gray-900 text-right">Chelsy Packaging Pvt Ltd.</span>
-                            </p>
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">Bank / Branch:</span>
-                              <span className="font-medium text-gray-900 text-right">Commercial Bank, Weliweriya branch</span>
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                        {/* Bank Account Details Box */}
+                        <div className="bg-gray-50 border border-gray-300 rounded-xl p-2.5 sm:p-3 text-left w-full sm:w-64 text-[11px] shadow-xs">
+                          <p className="font-bold text-gray-800 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1 border-b border-gray-200 pb-1">
+                            <span>🏦</span> Bank Account Details
+                          </p>
+                          {(() => {
+                            const bankInfo = isVatCustomer ? companyBanking?.vat : companyBanking?.non_vat;
+                            if (!bankInfo) {
+                              return (
+                                <div className="py-2 text-gray-500 italic text-[10px]">
+                                  Loading authenticated banking details...
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="space-y-0.5 text-gray-800 text-[11px]">
+                                <p className="flex justify-between gap-2">
+                                  <span className="font-semibold text-gray-700">A/C No:</span>
+                                  <span className="font-mono font-bold text-black text-xs">{bankInfo.account_no}</span>
+                                </p>
+                                <p className="flex justify-between gap-2">
+                                  <span className="font-semibold text-gray-700">A/C Name:</span>
+                                  <span className="font-medium text-gray-900 text-right">{bankInfo.account_name}</span>
+                                </p>
+                                <p className="flex justify-between gap-2">
+                                  <span className="font-semibold text-gray-700">Bank / Branch:</span>
+                                  <span className="font-medium text-gray-900 text-right">{bankInfo.bank_branch}</span>
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
 
                       {/* Signature line */}
                       <div className="text-left sm:text-right w-full sm:w-auto pt-1">
@@ -1056,16 +1092,20 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const prevTitle = document.title;
-                    document.title = `Quotation_${displayQuoteNo}_${(selectedQuote.customer_name || 'Customer').replace(/\s+/g, '_')}`;
-                    window.print();
-                    setTimeout(() => { document.title = prevTitle; }, 1000);
-                  }}
-                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-700 shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:scale-[1.01]"
-                  title="Save or download as PDF document"
+                  disabled={pdfLoading}
+                  onClick={() => handleDownloadSecurePdf(selectedQuote.id, reportTaxFormat, displayQuoteNo)}
+                  className={`font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-700 shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:scale-[1.01] ${pdfLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  title="Generate flattened, signed PDF via secure short-lived token"
                 >
-                  <span>📥</span> Save as PDF
+                  {pdfLoading ? (
+                    <>
+                      <span className="animate-spin">⏳</span> Generating...
+                    </>
+                  ) : (
+                    <>
+                      <span>🔒</span> Save as PDF
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
