@@ -230,11 +230,15 @@ def ensure_db_columns_exist():
                 ("die_length_input", "VARCHAR(50)"),
                 ("die_width_input", "VARCHAR(50)"),
             ]
+            is_postgres = db.engine.dialect.name == 'postgresql'
             for col_name, col_type in migration_cols:
                 for tbl in ["quote", "quotes"]:
                     try:
                         with db.engine.connect() as conn:
-                            conn.execute(db.text(f"ALTER TABLE {tbl} ADD COLUMN {col_name} {col_type}"))
+                            if is_postgres:
+                                conn.execute(db.text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS {col_name} {col_type}"))
+                            else:
+                                conn.execute(db.text(f"ALTER TABLE {tbl} ADD COLUMN {col_name} {col_type}"))
                             conn.commit()
                     except Exception:
                         pass

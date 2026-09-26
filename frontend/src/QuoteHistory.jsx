@@ -138,6 +138,11 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         thirdPartyCommission: quote.third_party_commission !== undefined ? quote.third_party_commission.toString() : '',
         hasTransport: quote.has_transport || false,
         transportCost: quote.transport_cost !== undefined ? quote.transport_cost.toString() : '',
+        oneTimeDieCost: (quote.die_making_cost && quote.die_making_cost > 0) ? String(quote.die_making_cost) : '',
+        oneTimeBlockCost: (quote.block_making_cost && quote.block_making_cost > 0) ? String(quote.block_making_cost) : '',
+        oneTimeTransportCost: (quote.one_time_transport_cost && quote.one_time_transport_cost > 0) ? String(quote.one_time_transport_cost) : '',
+        paymentMethod: quote.payment_method || 'Credit - 30 Days',
+        dimensionUnit: quote.dimension_unit || 'mm',
       };
 
       // Set forms state
