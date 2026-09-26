@@ -836,6 +836,18 @@ def download_quote_pdf():
         return jsonify({'error': f'Failed to generate PDF: {str(e)}'}), 500
 
 
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint: Return API status and link to the live frontend application"""
+    frontend = os.getenv('FRONTEND_URL', 'https://carton-costing-app-1.onrender.com')
+    return jsonify({
+        'service': 'carton-costing-api',
+        'status': 'online',
+        'message': 'Carton Costing API is running. Visit the web app at the frontend link below.',
+        'frontend_url': frontend
+    }), 200
+
+
 @app.route('/api/health', methods=['GET'])
 def health():
     """Lightweight ping endpoint for uptime monitors to prevent Render cold starts"""
