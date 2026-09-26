@@ -918,6 +918,14 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         slottingCost: isOutsource ? 0 : formData.slottingCost,
         bundlingCost: isOutsource ? 0 : formData.bundlingCost,
         diecuttingCost: isOutsource ? 0 : formData.diecuttingCost,
+        oneTimeDieCost: formData.oneTimeDieCost || '',
+        oneTimeBlockCost: formData.oneTimeBlockCost || '',
+        oneTimeTransportCost: formData.oneTimeTransportCost || '',
+        die_making_cost: parseFloat(formData.oneTimeDieCost || 0),
+        block_making_cost: parseFloat(formData.oneTimeBlockCost || 0),
+        one_time_transport_cost: parseFloat(formData.oneTimeTransportCost || 0),
+        paymentMethod: formData.paymentMethod || 'Credit - 30 Days',
+        payment_method: formData.paymentMethod || 'Credit - 30 Days',
         gsm_values: gsmArray, 
         calculated_cost: payloadCalculatedCost 
       }, {
