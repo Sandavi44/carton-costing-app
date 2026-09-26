@@ -57,7 +57,7 @@ _allowed_origins = [
 if _frontend_url:
     _allowed_origins.append(_frontend_url.rstrip('/'))
 
-CORS(app, origins=_allowed_origins, supports_credentials=True)
+CORS(app, origins=_allowed_origins, supports_credentials=True, expose_headers=['Content-Disposition', 'X-Quotation-Hash'])
 
 # ── Database ──────────────────────────────────────────────────────────────────
 # Render provides DATABASE_URL as postgres://... but SQLAlchemy needs postgresql://

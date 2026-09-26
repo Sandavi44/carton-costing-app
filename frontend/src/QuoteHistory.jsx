@@ -67,7 +67,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
       );
       if (response.data && response.data.download_url) {
         const downloadLink = document.createElement('a');
-        downloadLink.href = response.data.download_url;
+        const apiBase = axios.defaults.baseURL ? axios.defaults.baseURL.replace(/\/$/, '') : '';
+        downloadLink.href = response.data.download_url.startsWith('http')
+          ? response.data.download_url
+          : `${apiBase}${response.data.download_url}`;
         downloadLink.setAttribute('download', `Quotation_${displayQuoteNo}.pdf`);
         downloadLink.target = '_blank';
         document.body.appendChild(downloadLink);
