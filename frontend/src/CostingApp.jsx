@@ -859,7 +859,16 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
       setCalculatedCost(response.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Calculation error');
+      const serverError = err.response?.data?.error || err.response?.data?.msg;
+      if (serverError) {
+        setError(serverError);
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Server response timed out. The server may be waking up, please try again in a few moments.');
+      } else if (!err.response) {
+        setError('Unable to connect to backend server. If using Render free tier, the server may have been asleep — please click Calculate again.');
+      } else {
+        setError(`Calculation failed (${err.response.status}): ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -933,7 +942,14 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       });
       alert(`Quote saved successfully! Order No: ${response.data.quote_no}`);
     } catch (err) {
-      setError(err.response?.data?.error || 'Save error');
+      const serverError = err.response?.data?.error || err.response?.data?.msg;
+      if (serverError) {
+        setError(serverError);
+      } else if (!err.response) {
+        setError('Unable to reach server to save quote. Please check connection and try again.');
+      } else {
+        setError(`Failed to save quote (${err.response.status}): ${err.message || 'Unknown error'}`);
+      }
     }
   };
 
