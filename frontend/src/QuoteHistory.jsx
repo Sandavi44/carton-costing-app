@@ -24,6 +24,21 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
   const isSand = theme === 'sand';
   const isGreen = !isDark && !isSand;
 
+  const cleanOverlays = () => {
+    document.querySelectorAll('.html2pdf__overlay, .html2pdf__container').forEach(el => el.remove());
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        cleanOverlays();
+        setSelectedQuote(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const fetchHistory = async () => {
     setLoading(true);
     setError('');
@@ -84,7 +99,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
           html2canvas: { scale: 2, useCORS: true, logging: false },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        await window.html2pdf().set(opt).from(element).save();
+        await Promise.race([
+          window.html2pdf().set(opt).from(element).save(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('PDF generation timed out')), 8000))
+        ]);
       } catch (err) {
         console.error('html2pdf download error, falling back to print:', err);
         const prevTitle = document.title;
@@ -93,6 +111,8 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         setTimeout(() => { document.title = prevTitle; }, 1000);
       } finally {
         setDownloadingPdf(false);
+        cleanOverlays();
+        setTimeout(cleanOverlays, 300);
       }
     } else {
       const prevTitle = document.title;
@@ -662,7 +682,15 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         const paymentMethodDisplay = selectedQuote.payment_method || 'Credit - 30 Days';
 
         return (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
+          <div 
+            className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-[99999] overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                cleanOverlays();
+                setSelectedQuote(null);
+              }
+            }}
+          >
             {/* Inline Print Styles: Forces clean 1-Page Quotation */}
             <style>{`
               @media print {
@@ -792,8 +820,12 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                 </div>
 
                 <button
-                  onClick={() => setSelectedQuote(null)}
-                  className="text-gray-400 hover:text-gray-700 dark:hover:text-white text-xl font-bold p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    cleanOverlays();
+                    setSelectedQuote(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-700 dark:hover:text-white text-xl font-bold p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer relative z-10"
                   aria-label="Close"
                 >
                   ✕
@@ -1144,13 +1176,18 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedQuote(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    cleanOverlays();
+                    setSelectedQuote(null);
+                  }}
                   style={{
                     backgroundColor: isDark ? '#1a2332' : '#2d2417',
                     color: '#ffffff',
-                    borderColor: isDark ? '#334155' : '#443422'
+                    borderColor: isDark ? '#334155' : '#443422',
+                    cursor: 'pointer'
                   }}
-                  className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-xs sm:text-sm flex items-center justify-center"
+                  className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-xs sm:text-sm flex items-center justify-center relative z-20"
                 >
                   Close
                 </button>
