@@ -11,6 +11,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [reportTaxFormat, setReportTaxFormat] = useState('auto');
   const [actionLoading, setActionLoading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Filter States
   const [customerFilter, setCustomerFilter] = useState('');
@@ -64,6 +65,40 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
       alert(err.response?.data?.error || 'Failed to delete quote');
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleSavePdf = async (quote, displayNo) => {
+    const element = document.getElementById('printable-quotation-sheet');
+    if (!element) return;
+    const safeCustomer = (quote.customer_name || 'Customer').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `Quotation_${displayNo}_${safeCustomer}.pdf`;
+
+    if (window.html2pdf) {
+      setDownloadingPdf(true);
+      try {
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: fileName,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        await window.html2pdf().set(opt).from(element).save();
+      } catch (err) {
+        console.error('html2pdf download error, falling back to print:', err);
+        const prevTitle = document.title;
+        document.title = fileName.replace('.pdf', '');
+        window.print();
+        setTimeout(() => { document.title = prevTitle; }, 1000);
+      } finally {
+        setDownloadingPdf(false);
+      }
+    } else {
+      const prevTitle = document.title;
+      document.title = fileName.replace('.pdf', '');
+      window.print();
+      setTimeout(() => { document.title = prevTitle; }, 1000);
     }
   };
 
@@ -720,9 +755,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   <button
                     type="button"
                     onClick={() => setReportTaxFormat('auto')}
+                    style={reportTaxFormat === 'auto' ? { backgroundColor: '#d97706', color: '#ffffff' } : {}}
                     className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
                       reportTaxFormat === 'auto'
-                        ? 'bg-amber-600 text-white shadow-xs'
+                        ? 'shadow-xs'
                         : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
                     }`}
                     title="Auto-detect from saved quote tax setting"
@@ -732,9 +768,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   <button
                     type="button"
                     onClick={() => setReportTaxFormat('vat')}
+                    style={reportTaxFormat === 'vat' ? { backgroundColor: '#2563eb', color: '#ffffff' } : {}}
                     className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
                       reportTaxFormat === 'vat'
-                        ? 'bg-blue-600 text-white shadow-xs'
+                        ? 'shadow-xs'
                         : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
                     }`}
                   >
@@ -743,9 +780,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   <button
                     type="button"
                     onClick={() => setReportTaxFormat('non-vat')}
+                    style={reportTaxFormat === 'non-vat' ? { backgroundColor: '#059669', color: '#ffffff' } : {}}
                     className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
                       reportTaxFormat === 'non-vat'
-                        ? 'bg-emerald-600 text-white shadow-xs'
+                        ? 'shadow-xs'
                         : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
                     }`}
                   >
@@ -1055,22 +1093,36 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                 <button
                   type="button"
                   onClick={() => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no)}
-                  className="font-bold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60 text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(69, 10, 10, 0.6)' : '#fee2e2',
+                    color: isDark ? '#f87171' : '#b91c1c',
+                    borderColor: isDark ? '#991b1b' : '#fca5a5'
+                  }}
+                  className="font-bold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5 hover:opacity-90"
                 >
                   <span>🗑️</span> Delete Quote
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const prevTitle = document.title;
-                    document.title = `Quotation_${displayQuoteNo}_${(selectedQuote.customer_name || 'Customer').replace(/\s+/g, '_')}`;
-                    window.print();
-                    setTimeout(() => { document.title = prevTitle; }, 1000);
+                  disabled={downloadingPdf}
+                  onClick={() => handleSavePdf(selectedQuote, displayQuoteNo)}
+                  style={{
+                    backgroundColor: '#059669',
+                    color: '#ffffff',
+                    borderColor: '#047857'
                   }}
-                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-700 shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:scale-[1.01]"
-                  title="Save or download as PDF document"
+                  className={`font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:opacity-90 hover:scale-[1.01] ${downloadingPdf ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  title="Save quotation directly as a PDF document"
                 >
-                  <span>📥</span> Save as PDF
+                  {downloadingPdf ? (
+                    <>
+                      <span className="animate-spin">⏳</span> Generating...
+                    </>
+                  ) : (
+                    <>
+                      <span>📥</span> Save as PDF
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -1080,7 +1132,13 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                     window.print();
                     setTimeout(() => { document.title = prevTitle; }, 1000);
                   }}
-                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-white bg-blue-600 hover:bg-blue-700 border-blue-700 shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:scale-[1.01]"
+                  style={{
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    borderColor: '#1d4ed8'
+                  }}
+                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:opacity-90 hover:scale-[1.01]"
+                  title="Print quotation directly to printer"
                 >
                   <span>🖨️</span> Print Quotation
                 </button>
@@ -1089,9 +1147,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   onClick={() => setSelectedQuote(null)}
                   style={{
                     backgroundColor: isDark ? '#1a2332' : '#2d2417',
-                    color: '#ffffff'
+                    color: '#ffffff',
+                    borderColor: isDark ? '#334155' : '#443422'
                   }}
-                  className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-xs sm:text-sm text-white flex items-center justify-center"
+                  className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-xs sm:text-sm flex items-center justify-center"
                 >
                   Close
                 </button>

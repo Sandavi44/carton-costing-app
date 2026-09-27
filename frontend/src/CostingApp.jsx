@@ -1063,7 +1063,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           <input
             type="text"
             name="customerName"
-            placeholder="e.g. ABC Lanka"
+            placeholder=""
             value={formData.customerName}
             onChange={handleInputChange}
             className={inputClass}
@@ -1206,7 +1206,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
         <div>
           <label className={labelClass}>Quantity (cartons)</label>
-          <input type="number" name="quantity" placeholder="e.g. 1000" value={formData.quantity} onChange={handleInputChange} className={inputClass} />
+          <input type="number" name="quantity" placeholder="" value={formData.quantity} onChange={handleInputChange} className={inputClass} />
         </div>
 
         {currentBoardArea > 0 && (
@@ -1716,7 +1716,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             <input
               type="number"
               name="oneTimeDieCost"
-              placeholder="e.g. 8500 (Optional)"
+              placeholder=""
               value={formData.oneTimeDieCost || ''}
               onChange={handleInputChange}
               className={inputClass}
@@ -1734,7 +1734,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             <input
               type="number"
               name="oneTimeBlockCost"
-              placeholder="e.g. 4500 (Optional)"
+              placeholder=""
               value={formData.oneTimeBlockCost || ''}
               onChange={handleInputChange}
               className={inputClass}
@@ -1752,7 +1752,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             <input
               type="number"
               name="oneTimeTransportCost"
-              placeholder="e.g. 5000 (Optional)"
+              placeholder=""
               value={formData.oneTimeTransportCost || ''}
               onChange={handleInputChange}
               className={inputClass}
