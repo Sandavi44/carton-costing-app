@@ -171,6 +171,11 @@ class CostingParameters:
     has_transport: bool = False
     transport_cost: float = 0.0
 
+    # Auto-proposed process cost base rates from system parameters
+    joining_cost_glued_s: float = 3.00
+    joining_cost_glued_m: float = 4.50
+    joining_cost_glued_l: float = 6.00
+
 
 # ============================================================================
 # CALCULATION ENGINE
@@ -231,12 +236,15 @@ class CostingCalculator:
             h = getattr(self.params, 'carton_height_mm', 0.0)
             base_joining_cost = max(0.0, round(((h / 25.0) - 1.0) * 2.0, 2)) if h > 0 else 0.0
         else:
+            rate_s = getattr(self.params, 'joining_cost_glued_s', 3.00)
+            rate_m = getattr(self.params, 'joining_cost_glued_m', 4.50)
+            rate_l = getattr(self.params, 'joining_cost_glued_l', 6.00)
             if carton_category == "S":
-                base_joining_cost = 3.00
+                base_joining_cost = rate_s
             elif carton_category == "M":
-                base_joining_cost = 4.50
+                base_joining_cost = rate_m
             else:
-                base_joining_cost = 6.00
+                base_joining_cost = rate_l
         
         proposed_joining_cost = round(base_joining_cost * 1.5, 2) if is_two_up else base_joining_cost
 
@@ -346,6 +354,9 @@ class CostingCalculator:
                     "joining_cost": proposed_joining_cost,
                     "print_cost": proposed_print_cost,
                     "slotting_cost": proposed_slotting_cost,
+                    "joining_cost_glued_s": getattr(self.params, 'joining_cost_glued_s', 3.00),
+                    "joining_cost_glued_m": getattr(self.params, 'joining_cost_glued_m', 4.50),
+                    "joining_cost_glued_l": getattr(self.params, 'joining_cost_glued_l', 6.00),
                 }
             },
             "sheet_dimensions": {

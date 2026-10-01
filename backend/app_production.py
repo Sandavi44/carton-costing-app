@@ -248,6 +248,9 @@ def ensure_db_columns_exist():
                 ('outsource_waste_percent', '3', 'Outsource Waste allowance %'),
                 ('white_liner_board_rate', '285', 'White Liner Board Rate (Rs./kg)'),
                 ('brown_liner_board_rate', '260', 'Brown Liner Board Rate (Rs./kg)'),
+                ('joining_cost_glued_s', '3.00', 'Auto Joining Cost - Glued Type S (Rs.)'),
+                ('joining_cost_glued_m', '4.50', 'Auto Joining Cost - Glued Type M (Rs.)'),
+                ('joining_cost_glued_l', '6.00', 'Auto Joining Cost - Glued Type L (Rs.)'),
             ]
             for p_name, val, desc in default_params:
                 try:
@@ -384,6 +387,15 @@ def calculate_cost():
         brown_liner_param = SystemParameter.query.filter_by(parameter_name='brown_liner_board_rate').first()
         default_brown_liner = safe_float(brown_liner_param.value) if brown_liner_param else 260.0
 
+        glued_s_param = SystemParameter.query.filter_by(parameter_name='joining_cost_glued_s').first()
+        default_glued_s = safe_float(glued_s_param.value) if glued_s_param else 3.00
+
+        glued_m_param = SystemParameter.query.filter_by(parameter_name='joining_cost_glued_m').first()
+        default_glued_m = safe_float(glued_m_param.value) if glued_m_param else 4.50
+
+        glued_l_param = SystemParameter.query.filter_by(parameter_name='joining_cost_glued_l').first()
+        default_glued_l = safe_float(glued_l_param.value) if glued_l_param else 6.00
+
         raw_board_type = data.get('board_type') or data.get('boardType') or 'Brown Liner'
         is_white_board = ('white' in raw_board_type.lower())
         board_type = 'White Liner' if is_white_board else 'Brown Liner'
@@ -431,6 +443,9 @@ def calculate_cost():
             third_party_commission=safe_float(data.get('thirdPartyCommission', 0)),
             has_transport=data.get('hasTransport', False),
             transport_cost=safe_float(data.get('transportCost', 0)),
+            joining_cost_glued_s=safe_float(data.get('joining_cost_glued_s'), default_glued_s),
+            joining_cost_glued_m=safe_float(data.get('joining_cost_glued_m'), default_glued_m),
+            joining_cost_glued_l=safe_float(data.get('joining_cost_glued_l'), default_glued_l),
         )
         
         # Calculate
@@ -975,6 +990,9 @@ def init_db():
             ('outsource_waste_percent', '3', 'Outsource Waste allowance %'),
             ('white_liner_board_rate', '285', 'White Liner Board Rate (Rs./kg)'),
             ('brown_liner_board_rate', '260', 'Brown Liner Board Rate (Rs./kg)'),
+            ('joining_cost_glued_s', '3.00', 'Auto Joining Cost - Glued Type S (Rs.)'),
+            ('joining_cost_glued_m', '4.50', 'Auto Joining Cost - Glued Type M (Rs.)'),
+            ('joining_cost_glued_l', '6.00', 'Auto Joining Cost - Glued Type L (Rs.)'),
         ]
         
         for param_name, value, description in default_params:

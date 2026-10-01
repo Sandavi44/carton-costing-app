@@ -65,10 +65,14 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const cartonCategory = calculatedCost.dimensions?.carton_category || calculatedCost.category?.carton_category || (
     (calculatedCost.sheet_dimensions.board_area_m2 <= 0.450) ? 'S' : (calculatedCost.sheet_dimensions.board_area_m2 <= 0.800) ? 'M' : 'L'
   );
+  const rateS = parseFloat(calculatedCost.category?.proposed_costs?.joining_cost_glued_s ?? 3.0);
+  const rateM = parseFloat(calculatedCost.category?.proposed_costs?.joining_cost_glued_m ?? 4.5);
+  const rateL = parseFloat(calculatedCost.category?.proposed_costs?.joining_cost_glued_l ?? 6.0);
+
   const proposedJoining = calculatedCost.category?.proposed_costs?.joining_cost ?? (
     formData.joiningType === 'Stitched'
       ? (H > 0 ? Math.max(0, parseFloat(((((H / 25) - 1) * 2) * (isTwoUp ? 1.5 : 1)).toFixed(2))) : 0)
-      : parseFloat(((cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.5 : 6.0) * (isTwoUp ? 1.5 : 1)).toFixed(2))
+      : parseFloat(((cartonCategory === 'S' ? rateS : cartonCategory === 'M' ? rateM : rateL) * (isTwoUp ? 1.5 : 1)).toFixed(2))
   );
   const proposedPrint = calculatedCost.category?.proposed_costs?.print_cost ?? (
     formData.isPrinted ? (cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.0 : 6.0) : 0
@@ -464,7 +468,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                     {formData.joiningType === 'Stitched' ? (
                       <span>Equation: [({H} / 25) - 1] * 2{isTwoUp ? ' * 1.5 [2-Up]' : ''} = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
                     ) : (
-                      <span>Category Type {cartonCategory} (Glued: S=3.00, M=4.50, L=6.00{isTwoUp ? ' * 1.5 [2-Up]' : ''}) = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
+                      <span>Category Type {cartonCategory} (Glued: S={rateS.toFixed(2)}, M={rateM.toFixed(2)}, L={rateL.toFixed(2)}{isTwoUp ? ' * 1.5 [2-Up]' : ''}) = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
                     )}
                   </div>
                   {formData.isPrinted && (

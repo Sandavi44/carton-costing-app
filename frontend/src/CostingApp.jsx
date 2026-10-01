@@ -382,17 +382,21 @@ export const calculateBoardAreaAndCategory = (carton) => {
   return { boardArea, category, sheetLength, sheetWidth, isTwoUp, selectedReel: bestReel, sheetsPerReel: bestSheetsPerReel };
 };
 
-export const getProposedCosts = (carton, category, isTwoUp = false) => {
+export const getProposedCosts = (carton, category, isTwoUp = false, rates = {}) => {
+  const rateS = rates.joiningCostGluedS !== undefined ? parseFloat(rates.joiningCostGluedS) : 3.00;
+  const rateM = rates.joiningCostGluedM !== undefined ? parseFloat(rates.joiningCostGluedM) : 4.50;
+  const rateL = rates.joiningCostGluedL !== undefined ? parseFloat(rates.joiningCostGluedL) : 6.00;
+
   // 1. Joining Cost
   let proposedJoining = 0;
   if (carton.joiningType === 'Stitched') {
     const h = parseFloat(carton.cartonHeight) || 0;
     proposedJoining = h > 0 ? Math.max(0, parseFloat((((h / 25) - 1) * 2).toFixed(2))) : 0;
   } else {
-    // Glued: S -> 3.00, M -> 4.50, L -> 6.00
-    if (category === 'S') proposedJoining = 3.00;
-    else if (category === 'M') proposedJoining = 4.50;
-    else proposedJoining = 6.00;
+    // Glued base rates from system parameters: S, M, L
+    if (category === 'S') proposedJoining = rateS;
+    else if (category === 'M') proposedJoining = rateM;
+    else proposedJoining = rateL;
   }
 
   // If 2-Up method (RSC carton with sheet length > 1938 mm): multiply joining cost by 1.5
@@ -426,6 +430,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   const [systemRates, setSystemRates] = useState({
     whiteLinerRate: '285',
     brownLinerRate: '260',
+    joiningCostGluedS: 3.00,
+    joiningCostGluedM: 4.50,
+    joiningCostGluedL: 6.00,
   });
   const dimUnit = formData.dimensionUnit || 'mm'; // 'mm' or 'inches'
   const isDark = theme === 'dark';
@@ -476,9 +483,15 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         if (res.data) {
           const white = res.data.white_liner_board_rate ? String(res.data.white_liner_board_rate) : '285';
           const brown = res.data.brown_liner_board_rate ? String(res.data.brown_liner_board_rate) : '260';
+          const joinS = res.data.joining_cost_glued_s !== undefined ? parseFloat(res.data.joining_cost_glued_s) : 3.00;
+          const joinM = res.data.joining_cost_glued_m !== undefined ? parseFloat(res.data.joining_cost_glued_m) : 4.50;
+          const joinL = res.data.joining_cost_glued_l !== undefined ? parseFloat(res.data.joining_cost_glued_l) : 6.00;
           setSystemRates({
             whiteLinerRate: white,
             brownLinerRate: brown,
+            joiningCostGluedS: joinS,
+            joiningCostGluedM: joinM,
+            joiningCostGluedL: joinL,
           });
 
           // Sync default rate into form if it is empty or matches previous default
@@ -563,7 +576,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   }, [mmFormData, formData.cartonType, formData.plyType, formData.productionMethod, formData.taxType]);
 
   const { proposedJoining, proposedPrint, proposedSlotting } = useMemo(() => {
-    return getProposedCosts(mmFormData, currentCategory, currentIsTwoUp);
+    return getProposedCosts(mmFormData, currentCategory, currentIsTwoUp, systemRates);
   }, [
     formData.joiningType,
     mmFormData.cartonHeight,
@@ -571,7 +584,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     formData.plyType,
     formData.cartonType,
     currentCategory,
-    currentIsTwoUp
+    currentIsTwoUp,
+    systemRates
   ]);
 
   // Fetch next quote number when in new entry mode
@@ -850,6 +864,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         gsm_values: gsmArray,
         total_overhead_for_order: isOutsource ? 0 : parseFloat(formData.totalOverheadForOrder || 0),
         joining_cost: isOutsource ? 0 : parseFloat(formData.joiningCost !== '' && formData.joiningCost !== undefined ? formData.joiningCost : (proposedJoining || 0)),
+        joining_cost_glued_s: systemRates.joiningCostGluedS,
+        joining_cost_glued_m: systemRates.joiningCostGluedM,
+        joining_cost_glued_l: systemRates.joiningCostGluedL,
         print_cost: (!isOutsource && formData.isPrinted) ? parseFloat(formData.printCost !== '' && formData.printCost !== undefined ? formData.printCost : (proposedPrint || 0)) : 0,
         slotting_cost: (isOutsource || formData.cartonType !== 'RSC') ? 0 : parseFloat(formData.slottingCost !== '' && formData.slottingCost !== undefined ? formData.slottingCost : (proposedSlotting || 0)),
         bundling_cost: isOutsource ? 0 : parseFloat(formData.bundlingCost || 0),

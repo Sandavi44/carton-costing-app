@@ -51,6 +51,39 @@ export default function SystemParameters({ theme }) {
     }
   };
 
+  const getParamDisplay = (key) => {
+    switch (key) {
+      case 'joining_cost_glued_s':
+        return { label: 'Joining Cost - Glued (Type S)', unit: 'Rs./carton' };
+      case 'joining_cost_glued_m':
+        return { label: 'Joining Cost - Glued (Type M)', unit: 'Rs./carton' };
+      case 'joining_cost_glued_l':
+        return { label: 'Joining Cost - Glued (Type L)', unit: 'Rs./carton' };
+      case 'white_liner_board_rate':
+        return { label: 'White Liner Board Rate', unit: 'Rs./kg' };
+      case 'brown_liner_board_rate':
+        return { label: 'Brown Liner Board Rate', unit: 'Rs./kg' };
+      case 'profit_margin_percent':
+        return { label: 'Default Profit Margin', unit: '%' };
+      case 'vat_rate':
+        return { label: 'VAT Rate', unit: '%' };
+      case 'sscl_rate':
+        return { label: 'SSCL Rate', unit: '%' };
+      case 'input_tax_rate':
+        return { label: 'Input Tax Rate (Non-VAT)', unit: '%' };
+      case 'transport_rate_per_km':
+        return { label: 'Transport Rate Per Km', unit: 'Rs./km' };
+      case 'inhouse_waste_percent':
+        return { label: 'In-House Waste Allowance', unit: '%' };
+      case 'outsource_waste_percent':
+        return { label: 'Outsource Waste Allowance', unit: '%' };
+      case 'waste_allowance_percent':
+        return { label: 'Default Waste Allowance', unit: '%' };
+      default:
+        return { label: key.replace(/_/g, ' '), unit: '' };
+    }
+  };
+
   return (
     <div className={`rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-left relative border ${
       isDark 
@@ -89,7 +122,9 @@ export default function SystemParameters({ theme }) {
         </p>
       ) : (
         <div className="space-y-4">
-          {Object.entries(params).map(([key, val]) => (
+          {Object.entries(params).map(([key, val]) => {
+            const { label, unit } = getParamDisplay(key);
+            return (
             <div key={key} className={`flex justify-between items-center p-5 rounded-2xl border transition ${
               isDark 
                 ? 'bg-[#131924]/60 border-[#c5a880]/15 text-white hover:bg-[#1a2332]/80' 
@@ -101,10 +136,14 @@ export default function SystemParameters({ theme }) {
                 <p className={`font-semibold capitalize ${
                   isDark ? 'text-slate-200' : isSand ? 'text-[#5c4c36]' : 'text-[#14532d]'
                 }`}>
-                  {key.replace(/_/g, ' ')}
-                  {key.includes('board_rate') && (
-                    <span className="ml-2 text-xxs px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      Rs./kg
+                  {label}
+                  {unit && (
+                    <span className={`ml-2 text-xxs px-2 py-0.5 rounded-full font-bold border ${
+                      key.includes('joining_cost')
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                        : 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                    }`}>
+                      {unit}
                     </span>
                   )}
                 </p>
@@ -188,7 +227,8 @@ export default function SystemParameters({ theme }) {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
