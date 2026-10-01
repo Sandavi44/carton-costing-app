@@ -225,16 +225,20 @@ class CostingCalculator:
         # (1) Joining method:
         # Glued: S -> 3.00, M -> 4.50, L -> 6.00
         # Stitched: [(Carton Height / 25) - 1] * 2
+        # If 2-Up method (RSC carton with sheet length > 1938 mm): multiply joining cost by 1.5
+        is_two_up = getattr(self, 'is_two_up', False)
         if self.params.joining_type == "Stitched":
             h = getattr(self.params, 'carton_height_mm', 0.0)
-            proposed_joining_cost = max(0.0, round(((h / 25.0) - 1.0) * 2.0, 2)) if h > 0 else 0.0
+            base_joining_cost = max(0.0, round(((h / 25.0) - 1.0) * 2.0, 2)) if h > 0 else 0.0
         else:
             if carton_category == "S":
-                proposed_joining_cost = 3.00
+                base_joining_cost = 3.00
             elif carton_category == "M":
-                proposed_joining_cost = 4.50
+                base_joining_cost = 4.50
             else:
-                proposed_joining_cost = 6.00
+                base_joining_cost = 6.00
+        
+        proposed_joining_cost = round(base_joining_cost * 1.5, 2) if is_two_up else base_joining_cost
 
         # (2) Printing cost:
         # If is_printed: S -> 3.00, M -> 4.00, L -> 6.00; else 0.0
@@ -449,12 +453,20 @@ class CostingCalculator:
         return (self.params.carton_width_mm + self.params.carton_height_mm) + adjustment
     
     def _select_optimal_reel(self, sheet_width: float) -> int:
-        """Select reel that fits sheets with minimum waste"""
+        """Select reel that fits sheets with minimum waste.
+        For In-house costing (VAT or Non-VAT), reel width is limited to a maximum of 1600 mm.
+        For Outsource costing, the full range of reels up to 1850 mm remains available.
+        """
         best_reel = None
         best_sheets_per_reel = 0
         best_waste = float('inf')
         
-        for reel_width in REEL_WIDTHS:
+        prod_method = getattr(self.params, 'production_method', 'In-house')
+        tax_type = getattr(self.params, 'tax_type', '')
+        is_outsource = prod_method == "Outsource" or "Outsource" in tax_type
+        available_reels = REEL_WIDTHS if is_outsource else [r for r in REEL_WIDTHS if r <= 1600]
+        
+        for reel_width in available_reels:
             effective_width = reel_width - REEL_EDGE_LOSS_MM
             sheets_per_reel = int(effective_width / sheet_width)
             
@@ -467,7 +479,7 @@ class CostingCalculator:
                     best_sheets_per_reel = sheets_per_reel
                     best_waste = waste
         
-        return best_reel if best_reel else REEL_WIDTHS[-1]
+        return best_reel if best_reel else available_reels[-1]
     
     def _calculate_board_area(self, length_mm: float, width_mm: float) -> float:
         """Calculate board area in m²"""

@@ -66,7 +66,9 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
     (calculatedCost.sheet_dimensions.board_area_m2 <= 0.450) ? 'S' : (calculatedCost.sheet_dimensions.board_area_m2 <= 0.800) ? 'M' : 'L'
   );
   const proposedJoining = calculatedCost.category?.proposed_costs?.joining_cost ?? (
-    formData.joiningType === 'Stitched' ? (H > 0 ? Math.max(0, parseFloat((((H / 25) - 1) * 2).toFixed(2))) : 0) : (cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.5 : 6.0)
+    formData.joiningType === 'Stitched'
+      ? (H > 0 ? Math.max(0, parseFloat(((((H / 25) - 1) * 2) * (isTwoUp ? 1.5 : 1)).toFixed(2))) : 0)
+      : parseFloat(((cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.5 : 6.0) * (isTwoUp ? 1.5 : 1)).toFixed(2))
   );
   const proposedPrint = calculatedCost.category?.proposed_costs?.print_cost ?? (
     formData.isPrinted ? (cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.0 : 6.0) : 0
@@ -264,7 +266,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
             <div>
               <p className="text-sm font-semibold">1. Sheet Slicing Sourcing Area</p>
               <div className={solveBoxClass}>
-                <p className="opacity-70">Equation: Area = Sheet Length * Selected Reel Width / Slices</p>
+                <p className="opacity-70">Equation: Area = Sheet Length * Selected Reel Width / Slices {formData.productionMethod !== 'Outsource' ? '(In-House: Max Reel 1600 mm)' : '(Outsource: Max Reel 1850 mm)'}</p>
                 <p className="text-blue-500 font-bold mt-1">
                   Solve: ({sheetLength} * {selectedReel}) / {sheetsPerReel} = {(sheetLength * selectedReel / sheetsPerReel).toFixed(2)} mm²
                 </p>
@@ -460,9 +462,9 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                   <div>
                     <span className="font-bold">Joining Cost ({formData.joiningType}): </span>
                     {formData.joiningType === 'Stitched' ? (
-                      <span>Equation: [({H} / 25) - 1] * 2 = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
+                      <span>Equation: [({H} / 25) - 1] * 2{isTwoUp ? ' * 1.5 [2-Up]' : ''} = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
                     ) : (
-                      <span>Category Type {cartonCategory} (Glued: S=3.00, M=4.50, L=6.00) = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
+                      <span>Category Type {cartonCategory} (Glued: S=3.00, M=4.50, L=6.00{isTwoUp ? ' * 1.5 [2-Up]' : ''}) = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
                     )}
                   </div>
                   {formData.isPrinted && (

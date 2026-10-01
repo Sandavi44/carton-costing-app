@@ -312,6 +312,8 @@ export const calculateBoardAreaAndCategory = (carton) => {
   const W = parseFloat(carton.cartonWidth) || 0;
   const H = parseFloat(carton.cartonHeight) || 0;
   const ply = carton.plyType || '3-Ply';
+  const prodMethod = carton.productionMethod || 'In-house';
+  const isOutsource = prodMethod === 'Outsource' || (carton.taxType && carton.taxType.includes('Outsource'));
 
   let sheetLength = 0;
   let sheetWidth = 0;
@@ -336,10 +338,12 @@ export const calculateBoardAreaAndCategory = (carton) => {
     sheetWidth = (W + H) + wAdj;
   }
 
-  const REEL_WIDTHS = [
+  const ALL_REEL_WIDTHS = [
     950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400,
     1450, 1500, 1550, 1600, 1650, 1700, 1750, 1800, 1850
   ];
+  // In-house costings (VAT or Non-VAT) capped at 1600 mm; Outsource can use up to 1850 mm
+  const REEL_WIDTHS = isOutsource ? ALL_REEL_WIDTHS : ALL_REEL_WIDTHS.filter(r => r <= 1600);
   const EDGE_LOSS = 25;
 
   let bestReel = REEL_WIDTHS[REEL_WIDTHS.length - 1];
@@ -375,10 +379,10 @@ export const calculateBoardAreaAndCategory = (carton) => {
     category = 'L';
   }
 
-  return { boardArea, category, sheetLength, sheetWidth, isTwoUp };
+  return { boardArea, category, sheetLength, sheetWidth, isTwoUp, selectedReel: bestReel, sheetsPerReel: bestSheetsPerReel };
 };
 
-export const getProposedCosts = (carton, category) => {
+export const getProposedCosts = (carton, category, isTwoUp = false) => {
   // 1. Joining Cost
   let proposedJoining = 0;
   if (carton.joiningType === 'Stitched') {
@@ -389,6 +393,11 @@ export const getProposedCosts = (carton, category) => {
     if (category === 'S') proposedJoining = 3.00;
     else if (category === 'M') proposedJoining = 4.50;
     else proposedJoining = 6.00;
+  }
+
+  // If 2-Up method (RSC carton with sheet length > 1938 mm): multiply joining cost by 1.5
+  if (isTwoUp) {
+    proposedJoining = parseFloat((proposedJoining * 1.5).toFixed(2));
   }
 
   // 2. Printing Cost: S -> 3.00, M -> 4.00, L -> 6.00
@@ -551,17 +560,18 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
 
   const { boardArea: currentBoardArea, category: currentCategory, isTwoUp: currentIsTwoUp } = useMemo(() => {
     return calculateBoardAreaAndCategory(mmFormData);
-  }, [mmFormData, formData.cartonType, formData.plyType]);
+  }, [mmFormData, formData.cartonType, formData.plyType, formData.productionMethod, formData.taxType]);
 
   const { proposedJoining, proposedPrint, proposedSlotting } = useMemo(() => {
-    return getProposedCosts(mmFormData, currentCategory);
+    return getProposedCosts(mmFormData, currentCategory, currentIsTwoUp);
   }, [
     formData.joiningType,
     mmFormData.cartonHeight,
     formData.isPrinted,
     formData.plyType,
     formData.cartonType,
-    currentCategory
+    currentCategory,
+    currentIsTwoUp
   ]);
 
   // Fetch next quote number when in new entry mode
@@ -1419,8 +1429,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
                   <label className={labelClass}>Joining Cost (Rs./carton)</label>
                   <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
                     {formData.joiningType === 'Stitched'
-                      ? `Auto: Rs. ${proposedJoining.toFixed(2)} ([(H/25)-1]×2)`
-                      : `Auto: Rs. ${proposedJoining.toFixed(2)} (Type ${currentCategory})`}
+                      ? `Auto: Rs. ${proposedJoining.toFixed(2)} ([(H/25)-1]×2${currentIsTwoUp ? ' × 1.5 [2-Up]' : ''})`
+                      : `Auto: Rs. ${proposedJoining.toFixed(2)} (Type ${currentCategory}${currentIsTwoUp ? ' × 1.5 [2-Up]' : ''})`}
                   </span>
                 </div>
                 <div className="relative">
