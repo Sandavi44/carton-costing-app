@@ -96,6 +96,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
           margin: [8, 8, 8, 8],
           filename: fileName,
           image: { type: 'jpeg', quality: 0.98 },
+          enableLinks: false,
           html2canvas: { scale: 2, useCORS: true, logging: false },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
@@ -696,7 +697,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               @media print {
                 @page {
                   size: A4 portrait;
-                  margin: 10mm 14mm;
+                  margin: 0 !important;
                 }
                 html, body {
                   height: auto !important;
@@ -712,6 +713,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                 header,
                 footer {
                   display: none !important;
+                }
+                /* Remove any printed link URLs */
+                a[href]:after {
+                  content: none !important;
                 }
                 /* Reset modal wrapper so it doesn't create extra pages */
                 .fixed.inset-0 {
@@ -743,12 +748,13 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                   height: auto !important;
                   padding: 0 !important;
                 }
-                /* The Printable Quotation Sheet: Single Page, Natural Flow */
+                /* The Printable Quotation Sheet: Single Page, Natural Flow with 0 browser margins */
                 #printable-quotation-sheet {
                   position: static !important;
                   width: 100% !important;
+                  box-sizing: border-box !important;
                   margin: 0 auto !important;
-                  padding: 10px 15px !important;
+                  padding: 10mm 14mm !important;
                   background: white !important;
                   color: #111827 !important;
                   border: none !important;
