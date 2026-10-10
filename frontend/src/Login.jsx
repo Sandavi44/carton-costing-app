@@ -7,6 +7,7 @@ export default function Login({ onLoginSuccess, theme = 'green', setTheme }) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -23,7 +24,10 @@ export default function Login({ onLoginSuccess, theme = 'green', setTheme }) {
     setMessage('');
     setLoading(true);
 
-    if (!username || !password) {
+    const cleanUsername = (username || '').trim();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanUsername || !cleanPassword) {
       setError('Please fill in all required fields');
       setLoading(false);
       return;
@@ -31,11 +35,11 @@ export default function Login({ onLoginSuccess, theme = 'green', setTheme }) {
 
     try {
       if (isRegister) {
-        const response = await axios.post('/api/auth/register', { username, password, email });
+        const response = await axios.post('/api/auth/register', { username: cleanUsername, password: cleanPassword, email: email.trim() });
         setMessage(response.data.message + '! You can now log in.');
         setIsRegister(false);
       } else {
-        const response = await axios.post('/api/auth/login', { username, password });
+        const response = await axios.post('/api/auth/login', { username: cleanUsername, password: cleanPassword });
         const { access_token, user } = response.data;
         localStorage.setItem('access_token', access_token);
         localStorage.setItem('user', JSON.stringify(user));
@@ -250,15 +254,36 @@ export default function Login({ onLoginSuccess, theme = 'green', setTheme }) {
           )}
 
           <div>
-            <label className={labelClass}>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={inputClass}
-              placeholder="Enter password"
-              required
-            />
+            <div className="flex justify-between items-center mb-1">
+              <label className={labelClass}>Password</label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className={`text-xs font-semibold cursor-pointer select-none transition ${
+                  isDark ? 'text-amber-400 hover:text-amber-300' : isSand ? 'text-[#8c734b] hover:text-[#5c4c36]' : 'text-emerald-700 hover:text-emerald-800'
+                }`}
+              >
+                {showPassword ? '👁️ Hide' : '👁️ Show'}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${inputClass} pr-10`}
+                placeholder="Enter password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer text-base"
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
 
           <button
