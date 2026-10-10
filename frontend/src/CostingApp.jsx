@@ -1831,15 +1831,15 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
                     type="text"
                     id="printName"
                     name="printName"
-                    maxLength={12}
-                    placeholder="Max 12 chars"
+                    maxLength={22}
+                    placeholder="Max 22 chars"
                     value={formData.printName || ''}
                     onChange={handleInputChange}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-xl border-2 outline-none transition w-44 bg-white dark:bg-slate-900 border-blue-400 dark:border-blue-500/60 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30"
-                    title="Carton print identification name (max 12 characters)"
+                    className="px-3 py-1.5 text-xs font-semibold rounded-xl border-2 outline-none transition w-56 sm:w-64 bg-white dark:bg-slate-900 border-blue-400 dark:border-blue-500/60 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30"
+                    title="Carton print identification name (max 22 characters)"
                   />
                   <span className="text-[11px] font-mono opacity-60">
-                    {(formData.printName || '').length}/12
+                    {(formData.printName || '').length}/22
                   </span>
                 </div>
               )}
