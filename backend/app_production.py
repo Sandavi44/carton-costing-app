@@ -80,7 +80,6 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(120), unique=True)
     is_admin = db.Column(db.Boolean, default=False)
-    has_custom_password = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def set_password(self, password):
@@ -235,15 +234,20 @@ def seed_or_update_default_users():
         try:
             u = User.query.filter(db.func.lower(User.username) == conf['username'].lower()).first()
             if not u:
-                u = User(username=conf['username'], email=conf['email'], is_admin=conf['is_admin'], has_custom_password=False)
+                u = User(username=conf['username'], email=conf['email'], is_admin=conf['is_admin'])
                 u.password_hash = conf.get('password_hash') or u.password_hash
                 db.session.add(u)
+                db.session.commit()
             else:
                 u.username = conf['username']
                 u.is_admin = conf['is_admin']
-                if not getattr(u, 'has_custom_password', False):
+                # Ensure default password is initialized once via SystemParameter
+                param_key = f"init_pw_{conf['username'].lower()}_v1"
+                init_param = SystemParameter.query.filter_by(parameter_name=param_key).first()
+                if not init_param:
                     u.password_hash = conf.get('password_hash') or u.password_hash
-            db.session.commit()
+                    db.session.add(SystemParameter(parameter_name=param_key, value='true', description=f"Initial password set for {conf['username']}"))
+                db.session.commit()
         except Exception:
             db.session.rollback()
 
@@ -288,18 +292,6 @@ def ensure_db_columns_exist():
                             conn.commit()
                     except Exception:
                         pass
-
-            # User table migrations
-            for tbl in ["user", "users"]:
-                try:
-                    with db.engine.connect() as conn:
-                        if is_postgres:
-                            conn.execute(db.text(f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS has_custom_password BOOLEAN DEFAULT FALSE"))
-                        else:
-                            conn.execute(db.text(f"ALTER TABLE {tbl} ADD COLUMN has_custom_password BOOLEAN DEFAULT 0"))
-                        conn.commit()
-                except Exception:
-                    pass
 
             default_params = [
                 ('inhouse_waste_percent', '5', 'Inhouse Waste allowance %'),
@@ -396,7 +388,12 @@ def change_password():
 
         user.set_password(new_password)
         try:
-            user.has_custom_password = True
+            param_key = f"init_pw_{user.username.lower()}_v1"
+            param = SystemParameter.query.filter_by(parameter_name=param_key).first()
+            if not param:
+                db.session.add(SystemParameter(parameter_name=param_key, value='custom', description=f"Custom password set for {user.username}"))
+            else:
+                param.value = 'custom'
         except Exception:
             pass
         db.session.commit()
