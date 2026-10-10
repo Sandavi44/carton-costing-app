@@ -90,12 +90,27 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
     const selectedList = quotes.filter(q => selectedQuoteIds.includes(q.id));
     if (selectedList.length === 0) return;
 
-    const customerNames = Array.from(new Set(selectedList.map(q => q.customer_name)));
+    // 1. Strict validation: Customer name check (STOP with error if different customers)
+    const customerNames = Array.from(new Set(selectedList.map(q => (q.customer_name || '').trim()).filter(Boolean)));
     if (customerNames.length > 1) {
-      if (!window.confirm(`You selected quotes from different customers (${customerNames.join(', ')}). Compile them together under "${customerNames[0]}"?`)) {
-        return;
-      }
+      const errMsg = `Cannot compile quotations from different customers (${customerNames.join(', ')}). All selected quotations must belong to the same customer.`;
+      setError(errMsg);
+      alert(`❌ ${errMsg}`);
+      return;
     }
+
+    // 2. Strict validation: Tax format check (STOP with error if VAT and Non-VAT are mixed)
+    const hasVat = selectedList.some(q => !q.tax_type || !q.tax_type.includes('Non-VAT'));
+    const hasNonVat = selectedList.some(q => q.tax_type && q.tax_type.includes('Non-VAT'));
+    if (hasVat && hasNonVat) {
+      const errMsg = 'Cannot compile VAT and Non-VAT quotations together. All selected quotations must have the same tax format (either all VAT or all Non-VAT).';
+      setError(errMsg);
+      alert(`❌ ${errMsg}`);
+      return;
+    }
+
+    // Clear any previous error
+    setError('');
 
     const compiledItems = [];
     selectedList.forEach(q => {
@@ -434,32 +449,66 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
       ) : (
         <>
           {/* Compilation Action Banner when quotes are selected */}
-          {selectedQuoteIds.length > 0 && (
-            <div className={`p-4 mb-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border shadow-md animate-fade-in ${
-              isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-900'
-            }`}>
-              <div className="flex items-center gap-2 font-bold text-sm">
-                <span>☑️</span>
-                <span>{selectedQuoteIds.length} quote(s) selected for compilation</span>
+          {(() => {
+            if (selectedQuoteIds.length === 0) return null;
+            const selList = quotes.filter(q => selectedQuoteIds.includes(q.id));
+            const custs = Array.from(new Set(selList.map(q => (q.customer_name || '').trim()).filter(Boolean)));
+            const hasMultipleCustomers = custs.length > 1;
+            const hasVat = selList.some(q => !q.tax_type || !q.tax_type.includes('Non-VAT'));
+            const hasNonVat = selList.some(q => q.tax_type && q.tax_type.includes('Non-VAT'));
+            const hasMixedTax = hasVat && hasNonVat;
+            const isInvalid = hasMultipleCustomers || hasMixedTax;
+
+            return (
+              <div className={`p-4 mb-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border shadow-md animate-fade-in ${
+                isInvalid
+                  ? isDark ? 'bg-red-950/40 border-red-800/60 text-red-200' : 'bg-red-50 border-red-300 text-red-900'
+                  : isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-900'
+              }`}>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <span>{isInvalid ? '⚠️' : '☑️'}</span>
+                    <span>{selectedQuoteIds.length} quote(s) selected for compilation</span>
+                    {!isInvalid && custs.length === 1 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        {custs[0]} ({hasNonVat ? 'Non-VAT' : 'VAT'})
+                      </span>
+                    )}
+                  </div>
+                  {hasMultipleCustomers && (
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">
+                      ❌ Selected quotes belong to different customers ({custs.join(', ')}). All must belong to the same customer.
+                    </p>
+                  )}
+                  {hasMixedTax && (
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">
+                      ❌ Selected quotes mix VAT and Non-VAT. All must have the same tax format.
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCompileSelected}
+                    className={`px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md cursor-pointer transition ${
+                      isInvalid 
+                        ? 'bg-gray-400 text-gray-200 dark:bg-slate-700 dark:text-slate-400 hover:opacity-90' 
+                        : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white hover:scale-[1.02]'
+                    }`}
+                  >
+                    📑 Compile Selected ({selectedQuoteIds.length}) into One Quotation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQuoteIds([])}
+                    className="px-3 py-2 rounded-xl font-bold text-xs bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 cursor-pointer transition"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCompileSelected}
-                  className="px-4 py-2 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white shadow-md cursor-pointer transition hover:scale-[1.02]"
-                >
-                  📑 Compile Selected ({selectedQuoteIds.length}) into One Quotation
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedQuoteIds([])}
-                  className="px-3 py-2 rounded-xl font-bold text-xs bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 cursor-pointer transition"
-                >
-                  Clear Selection
-                </button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div className={`overflow-x-auto rounded-2xl border ${
             isDark ? 'border-[#c5a880]/20' : isSand ? 'border-[#dfd5bc]' : 'border-[#bbf7d0]'
