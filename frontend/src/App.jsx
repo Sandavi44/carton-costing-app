@@ -160,66 +160,35 @@ function App() {
                   📦 Carton Costing System
                 </span>
               </div>
-              {/* Tabs */}
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <button
-                  onClick={() => setActiveTab('calculator')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition cursor-pointer ${
-                    activeTab === 'calculator'
-                      ? isDark ? 'border-[#d4af37] text-[#d4af37]' : isSand ? 'border-[#8c734b] text-[#8c734b]' : 'border-[#16a34a] text-[#15803d]'
-                      : isDark
-                        ? 'border-transparent text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                        : isSand
-                          ? 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-[#5c4c36]'
-                          : 'border-transparent text-emerald-800/70 hover:border-[#bbf7d0] hover:text-emerald-950'
-                  }`}
-                >
-                  Calculator
-                </button>
-                <button
-                  onClick={() => setActiveTab('steps')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition cursor-pointer ${
-                    activeTab === 'steps'
-                      ? isDark ? 'border-[#d4af37] text-[#d4af37]' : isSand ? 'border-[#8c734b] text-[#8c734b]' : 'border-[#16a34a] text-[#15803d]'
-                      : isDark
-                        ? 'border-transparent text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                        : isSand
-                          ? 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-[#5c4c36]'
-                          : 'border-transparent text-emerald-800/70 hover:border-[#bbf7d0] hover:text-emerald-950'
-                  }`}
-                >
-                  Calculation Logic
-                </button>
-                <button
-                  onClick={() => setActiveTab('history')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition cursor-pointer ${
-                    activeTab === 'history'
-                      ? isDark ? 'border-[#d4af37] text-[#d4af37]' : isSand ? 'border-[#8c734b] text-[#8c734b]' : 'border-[#16a34a] text-[#15803d]'
-                      : isDark
-                        ? 'border-transparent text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                        : isSand
-                          ? 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-[#5c4c36]'
-                          : 'border-transparent text-emerald-800/70 hover:border-[#bbf7d0] hover:text-emerald-950'
-                  }`}
-                >
-                  Quote History
-                </button>
-                {user?.is_admin && (
+              {/* Desktop / Tablet Tabs */}
+              <div className="hidden md:flex items-center space-x-1 lg:space-x-2 ml-3 lg:ml-6">
+                {[
+                  { id: 'calculator', label: 'Calculator', icon: '🧮' },
+                  { id: 'steps', label: 'Calculation Logic', icon: '📐' },
+                  { id: 'history', label: 'Quote History', icon: '📜' },
+                  ...(user?.is_admin ? [{ id: 'parameters', label: 'System Parameters', icon: '⚙️' }] : []),
+                ].map((tab) => (
                   <button
-                    onClick={() => setActiveTab('parameters')}
-                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition cursor-pointer ${
-                      activeTab === 'parameters'
-                        ? isDark ? 'border-[#d4af37] text-[#d4af37]' : isSand ? 'border-[#8c734b] text-[#8c734b]' : 'border-[#16a34a] text-[#15803d]'
-                        : isDark
-                          ? 'border-transparent text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-xl text-xs lg:text-sm font-semibold transition cursor-pointer ${
+                      activeTab === tab.id
+                        ? isDark
+                          ? 'bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/40 shadow-xs font-bold'
                           : isSand
-                            ? 'border-transparent text-gray-500 hover:border-[#dfd5bc] hover:text-[#5c4c36]'
-                            : 'border-transparent text-emerald-800/70 hover:border-[#bbf7d0] hover:text-emerald-950'
+                            ? 'bg-[#8c734b]/20 text-[#8c734b] border border-[#8c734b]/40 shadow-xs font-bold'
+                            : 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs font-bold'
+                        : isDark
+                          ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                          : isSand
+                            ? 'text-[#5c4c36]/70 hover:text-[#5c4c36] hover:bg-[#efebe1]'
+                            : 'text-emerald-900/70 hover:text-emerald-950 hover:bg-emerald-100/60'
                     }`}
                   >
-                    System Parameters
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
                   </button>
-                )}
+                ))}
               </div>
             </div>
             
@@ -316,6 +285,43 @@ function App() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Mobile & Narrow Screens Tab Strip */}
+        <div className={`md:hidden flex items-center gap-2 px-3 py-2 border-t overflow-x-auto shadow-inner ${
+          isDark 
+            ? 'bg-[#0c1018] border-slate-800' 
+            : isSand 
+              ? 'bg-[#f4efe5] border-[#dfd5bc]' 
+              : 'bg-[#dcf0dc] border-[#bbf7d0]'
+        }`}>
+          {[
+            { id: 'calculator', label: 'Calculator', icon: '🧮' },
+            { id: 'steps', label: 'Calculation Logic', icon: '📐' },
+            { id: 'history', label: 'Quote History', icon: '📜' },
+            ...(user?.is_admin ? [{ id: 'parameters', label: 'System Parameters', icon: '⚙️' }] : []),
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                activeTab === tab.id
+                  ? isDark
+                    ? 'bg-[#d4af37] text-slate-950 shadow-xs'
+                    : isSand
+                      ? 'bg-[#8c734b] text-white shadow-xs'
+                      : 'bg-emerald-700 text-white shadow-xs'
+                  : isDark
+                    ? 'bg-slate-800/80 text-slate-300 hover:bg-slate-800'
+                    : isSand
+                      ? 'bg-white/80 text-[#5c4c36] border border-[#dfd5bc]'
+                      : 'bg-white/80 text-emerald-900 border border-emerald-200'
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
       </nav>
 
