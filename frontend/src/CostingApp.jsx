@@ -740,6 +740,9 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         if (value === 'S.F.') {
           updated.joiningCost = '0.00';
           updated.joiningCostManual = false;
+          updated.cartonLength = '';
+          updated.cartonWidth = '';
+          updated.cartonHeight = '';
         }
       }
       if (name === 'plyType') {
@@ -842,11 +845,20 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
     setLoading(true);
 
     try {
-      if (!formData.customerName || !formData.cartonLength || !formData.cartonWidth || 
-          !formData.cartonHeight || !formData.quantity) {
-        setError('Please fill all carton dimensions and quantity');
-        setLoading(false);
-        return;
+      const isSF = formData.cartonType === 'S.F.';
+      if (isSF) {
+        if (!formData.customerName || !formData.dieLength || !formData.dieWidth || !formData.quantity) {
+          setError('Please fill customer name, board size (length & width), and quantity');
+          setLoading(false);
+          return;
+        }
+      } else {
+        if (!formData.customerName || !formData.cartonLength || !formData.cartonWidth || 
+            !formData.cartonHeight || !formData.quantity) {
+          setError('Please fill all carton dimensions and quantity');
+          setLoading(false);
+          return;
+        }
       }
 
       const activeField = getActiveRateFieldName(formData.boardType);
@@ -1161,7 +1173,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           </select>
         </div>
 
-        {/* DIE SIZE INPUTS (shown when carton type is not RSC: Lock Type, Mail Type, Special Shape, S.F.) */}
+        {/* DIE SIZE / BOARD SIZE INPUTS (shown when carton type is not RSC: Lock Type, Mail Type, Special Shape, S.F.) */}
         {formData.cartonType && formData.cartonType !== 'RSC' && (
           <div className={`p-4 rounded-2xl mb-4 border transition-all duration-200 ${
             isDark 
@@ -1171,31 +1183,33 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
                 : 'bg-[#e2f0d9] border-[#bbf7d0] text-[#14532d]'
           }`}>
             <p className="text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span>✂️</span> Die Size ({dimUnit}) — Direct Board Size
+              <span>✂️</span> {formData.cartonType === 'S.F.' ? `Board Size (${dimUnit}) — Direct Sheet Dimensions` : `Die Size (${dimUnit}) — Direct Board Size`}
             </p>
             <p className="text-xs opacity-80 mb-3">
-              For {formData.cartonType}, the die dimensions below are directly used as the board sheet dimensions (Sheet Length & Sheet Width).
+              {formData.cartonType === 'S.F.'
+                ? 'For Single Face (S.F.), enter the sheet board length and width directly.'
+                : `For ${formData.cartonType}, the die dimensions below are directly used as the board sheet dimensions (Sheet Length & Sheet Width).`}
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Die Length ({dimUnit}) [L]</label>
+                <label className={labelClass}>{formData.cartonType === 'S.F.' ? `Board Length (${dimUnit}) [L]` : `Die Length (${dimUnit}) [L]`}</label>
                 <input
                   type="number"
                   step={dimUnit === 'inches' ? '0.01' : '1'}
                   name="dieLength"
-                  placeholder={dimUnit === 'inches' ? 'e.g. 15.50' : 'Die Length (mm)'}
+                  placeholder={dimUnit === 'inches' ? 'e.g. 15.50' : 'Length (mm)'}
                   value={formData.dieLength || ''}
                   onChange={handleInputChange}
                   className={inputClass}
                 />
               </div>
               <div>
-                <label className={labelClass}>Die Width ({dimUnit}) [W]</label>
+                <label className={labelClass}>{formData.cartonType === 'S.F.' ? `Board Width (${dimUnit}) [W]` : `Die Width (${dimUnit}) [W]`}</label>
                 <input
                   type="number"
                   step={dimUnit === 'inches' ? '0.01' : '1'}
                   name="dieWidth"
-                  placeholder={dimUnit === 'inches' ? 'e.g. 10.25' : 'Die Width (mm)'}
+                  placeholder={dimUnit === 'inches' ? 'e.g. 10.25' : 'Width (mm)'}
                   value={formData.dieWidth || ''}
                   onChange={handleInputChange}
                   className={inputClass}
@@ -1205,91 +1219,57 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           </div>
         )}
         
-        {/* Horizontal Sequential Spaces for L, W, H with Unit Click-Box Selector */}
-        <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
-          <div className="flex items-center gap-2">
-            <label className={labelClass}>Carton Dimensions</label>
-            {formData.cartonType === 'S.F.' && (
-              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                (Inactive for S.F. — Use Die Size above)
-              </span>
-            )}
-          </div>
-          {/* Click box for mm / inches */}
-          <div className={`flex items-center gap-1 p-1 rounded-xl border text-xs font-bold ${
-            isDark ? 'bg-slate-800/80 border-slate-700' : isSand ? 'bg-[#faf8f5] border-[#dfd5bc]' : 'bg-[#eaf5ea] border-[#bbf7d0]'
-          }`}>
-            <span className="text-[11px] px-1 opacity-70">Unit:</span>
-            <button
-              type="button"
-              onClick={() => handleUnitChange('mm')}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer select-none text-xs font-bold ${
-                dimUnit === 'mm'
-                  ? isDark ? 'bg-[#d4af37] text-slate-950 font-black shadow-xs' : 'bg-emerald-700 text-white font-black shadow-xs'
-                  : 'opacity-70 hover:opacity-100'
-              }`}
-            >
-              mm
-            </button>
-            <button
-              type="button"
-              onClick={() => handleUnitChange('inches')}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer select-none text-xs font-bold ${
-                dimUnit === 'inches'
-                  ? isDark ? 'bg-[#d4af37] text-slate-950 font-black shadow-xs' : 'bg-emerald-700 text-white font-black shadow-xs'
-                  : 'opacity-70 hover:opacity-100'
-              }`}
-            >
-              inches
-            </button>
-          </div>
-        </div>
+        {/* CARTON DIMENSIONS: Only shown for non-S.F. cartons (RSC, Lock Type, Mail Type, Special Shape) */}
+        {formData.cartonType !== 'S.F.' && (
+          <div>
+            <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
+              <label className={labelClass}>Carton Dimensions</label>
+            </div>
 
-        {/* 3 Input Slots for L, W, H in Selected Unit */}
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div>
-            <label className={labelClass}>Carton Length ({dimUnit})</label>
-            <input
-              type="number"
-              step={dimUnit === 'inches' ? '0.01' : '1'}
-              name="cartonLength"
-              placeholder={formData.cartonType === 'S.F.' ? 'N/A for S.F.' : (dimUnit === 'inches' ? 'e.g. 19.69' : 'L (mm)')}
-              value={formData.cartonType === 'S.F.' ? '' : formData.cartonLength}
-              onChange={handleInputChange}
-              disabled={formData.cartonType === 'S.F.'}
-              className={`${inputClass} ${formData.cartonType === 'S.F.' ? 'opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
-            />
+            {/* 3 Input Slots for L, W, H in Selected Unit */}
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className={labelClass}>Carton Length ({dimUnit})</label>
+                <input
+                  type="number"
+                  step={dimUnit === 'inches' ? '0.01' : '1'}
+                  name="cartonLength"
+                  placeholder={dimUnit === 'inches' ? 'e.g. 19.69' : 'L (mm)'}
+                  value={formData.cartonLength}
+                  onChange={handleInputChange}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Carton Width ({dimUnit})</label>
+                <input
+                  type="number"
+                  step={dimUnit === 'inches' ? '0.01' : '1'}
+                  name="cartonWidth"
+                  placeholder={dimUnit === 'inches' ? 'e.g. 11.81' : 'W (mm)'}
+                  value={formData.cartonWidth}
+                  onChange={handleInputChange}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Carton Height ({dimUnit})</label>
+                <input
+                  type="number"
+                  step={dimUnit === 'inches' ? '0.01' : '1'}
+                  name="cartonHeight"
+                  placeholder={dimUnit === 'inches' ? 'e.g. 7.87' : 'H (mm)'}
+                  value={formData.cartonHeight}
+                  onChange={handleInputChange}
+                  className={inputClass}
+                />
+              </div>
+            </div>
           </div>
-          <div>
-            <label className={labelClass}>Carton Width ({dimUnit})</label>
-            <input
-              type="number"
-              step={dimUnit === 'inches' ? '0.01' : '1'}
-              name="cartonWidth"
-              placeholder={formData.cartonType === 'S.F.' ? 'N/A for S.F.' : (dimUnit === 'inches' ? 'e.g. 11.81' : 'W (mm)')}
-              value={formData.cartonType === 'S.F.' ? '' : formData.cartonWidth}
-              onChange={handleInputChange}
-              disabled={formData.cartonType === 'S.F.'}
-              className={`${inputClass} ${formData.cartonType === 'S.F.' ? 'opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Carton Height ({dimUnit})</label>
-            <input
-              type="number"
-              step={dimUnit === 'inches' ? '0.01' : '1'}
-              name="cartonHeight"
-              placeholder={formData.cartonType === 'S.F.' ? 'N/A for S.F.' : (dimUnit === 'inches' ? 'e.g. 7.87' : 'H (mm)')}
-              value={formData.cartonType === 'S.F.' ? '' : formData.cartonHeight}
-              onChange={handleInputChange}
-              disabled={formData.cartonType === 'S.F.'}
-              className={`${inputClass} ${formData.cartonType === 'S.F.' ? 'opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
-            />
-          </div>
-        </div>
+        )}
 
         <div>
-          <label className={labelClass}>Quantity (cartons)</label>
+          <label className={labelClass}>{formData.cartonType === 'S.F.' ? 'Quantity (sheets / boards)' : 'Quantity (cartons)'}</label>
           <input type="number" name="quantity" placeholder="" value={formData.quantity} onChange={handleInputChange} className={inputClass} />
         </div>
 
