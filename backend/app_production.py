@@ -1094,11 +1094,8 @@ def init_db():
                 except Exception:
                     pass  # Column already exists or table doesn't match
         
-        # Create admin user
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', email='admin@example.com', is_admin=True)
-            admin.set_password('admin123')
-            db.session.add(admin)
+        # Seed required users: Admin, Manoj, Kaushalya
+        seed_or_update_default_users()
         
         # Create default parameters
         default_params = [
