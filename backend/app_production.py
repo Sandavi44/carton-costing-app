@@ -191,6 +191,7 @@ class Quote(db.Model):
     block_making_cost = db.Column(db.Float, default=0.0)
     one_time_transport_cost = db.Column(db.Float, default=0.0)
     payment_method = db.Column(db.String(100), default="Credit - 30 Days")
+    items = db.Column(db.Text, nullable=True)  # JSON-encoded array of items for multi-item quotes
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -231,6 +232,7 @@ def ensure_db_columns_exist():
                 ("die_length_input", "VARCHAR(50)"),
                 ("die_width_input", "VARCHAR(50)"),
                 ("transport_option", "VARCHAR(100) DEFAULT 'Ex factory price from Biyagama factory ( No transport)'"),
+                ("items", "TEXT"),
             ]
             is_postgres = db.engine.dialect.name == 'postgresql'
             for col_name, col_type in migration_cols:
@@ -463,7 +465,7 @@ def calculate_cost():
 @app.route('/api/quotes/save', methods=['POST'])
 @jwt_required()
 def save_quote():
-    """Save quote to database - CORRECTED"""
+    """Save quote to database - supports single item and multi-item quotes"""
     try:
         user_id = int(get_jwt_identity())
         data = request.get_json()
@@ -475,57 +477,76 @@ def save_quote():
             db.session.add(customer)
             db.session.flush()
         
+        raw_items = data.get('items')
+        is_multi_item = isinstance(raw_items, list) and len(raw_items) > 0
+        first_item = raw_items[0] if is_multi_item else data
+        
         # Parse GSM values
-        gsm_values = data.get('gsm_values', [])
+        gsm_values = first_item.get('gsm_values', data.get('gsm_values', []))
         if isinstance(gsm_values, str):
             gsm_values = json.loads(gsm_values)
         
         # Determine production method
-        production_method = data.get('productionMethod') or data.get('production_method', 'In-house')
+        production_method = first_item.get('productionMethod') or first_item.get('production_method') or data.get('productionMethod') or data.get('production_method', 'In-house')
         is_outsource = production_method == 'Outsource'
 
         # Calculate overhead per carton (0 if Outsource)
         total_overhead = 0.0 if is_outsource else safe_float(data.get('totalOverheadForOrder', 0))
-        quantity = safe_int(data.get('quantity', 1))
-        overhead_per_carton = total_overhead / quantity if quantity > 0 else 0
+        
+        if is_multi_item:
+            overall_quantity = sum(safe_int(item.get('quantity', 0)) for item in raw_items)
+            items_sum = sum(
+                safe_float(item.get('total_cost_batch') or item.get('totalCostBatch') or 
+                           (safe_float(item.get('final_cost_per_carton') or item.get('finalCostPerCarton', 0)) * safe_int(item.get('quantity', 1))))
+                for item in raw_items
+            )
+            die_cost = safe_float(data.get('oneTimeDieCost') or data.get('die_making_cost') or 0)
+            block_cost = safe_float(data.get('oneTimeBlockCost') or data.get('block_making_cost') or 0)
+            one_time_trans = safe_float(data.get('oneTimeTransportCost') or data.get('one_time_transport_cost') or 0)
+            overall_batch_cost = items_sum + die_cost + block_cost + one_time_trans
+        else:
+            overall_quantity = safe_int(data.get('quantity', 1))
+            overall_batch_cost = None
+
+        overhead_per_carton = total_overhead / overall_quantity if overall_quantity > 0 else 0
         
         # Create quote
         quote = Quote(
             user_id=user_id,
             customer_id=customer.id,
             customer_name=data.get('customerName'),
-            carton_length_mm=round(safe_float(data.get('cartonLength'))),
-            carton_width_mm=round(safe_float(data.get('cartonWidth'))),
-            carton_height_mm=round(safe_float(data.get('cartonHeight'))),
-            dimension_unit=data.get('dimension_unit') or data.get('dimensionUnit') or 'mm',
-            carton_length_input=str(data.get('carton_length_input') or data.get('cartonLengthInput') or ''),
-            carton_width_input=str(data.get('carton_width_input') or data.get('cartonWidthInput') or ''),
-            carton_height_input=str(data.get('carton_height_input') or data.get('cartonHeightInput') or ''),
-            die_length_input=str(data.get('die_length_input') or data.get('dieLengthInput') or ''),
-            die_width_input=str(data.get('die_width_input') or data.get('dieWidthInput') or ''),
-            quantity=quantity,
-            ply_type=data.get('plyType'),
-            board_type='White Liner' if 'white' in str(data.get('boardType') or data.get('board_type') or '').lower() else 'Brown Liner',
-            flute_type=data.get('fluteType') or data.get('flute_type', 'B-Flute'),
-            flute_type_2=data.get('fluteType2') or data.get('flute_type_2') or data.get('fluteType') or data.get('flute_type', 'B-Flute'),
+            carton_length_mm=round(safe_float(first_item.get('cartonLength') or first_item.get('carton_length_mm', 0))),
+            carton_width_mm=round(safe_float(first_item.get('cartonWidth') or first_item.get('carton_width_mm', 0))),
+            carton_height_mm=round(safe_float(first_item.get('cartonHeight') or first_item.get('carton_height_mm', 0))),
+            dimension_unit=first_item.get('dimension_unit') or first_item.get('dimensionUnit') or data.get('dimension_unit') or data.get('dimensionUnit') or 'mm',
+            carton_length_input=str(first_item.get('carton_length_input') or first_item.get('cartonLengthInput') or ''),
+            carton_width_input=str(first_item.get('carton_width_input') or first_item.get('cartonWidthInput') or ''),
+            carton_height_input=str(first_item.get('carton_height_input') or first_item.get('cartonHeightInput') or ''),
+            die_length_input=str(first_item.get('die_length_input') or first_item.get('dieLengthInput') or ''),
+            die_width_input=str(first_item.get('die_width_input') or first_item.get('dieWidthInput') or ''),
+            quantity=overall_quantity,
+            ply_type=first_item.get('plyType') or first_item.get('ply_type', '3-Ply'),
+            board_type='White Liner' if 'white' in str(first_item.get('boardType') or first_item.get('board_type') or '').lower() else 'Brown Liner',
+            flute_type=first_item.get('fluteType') or first_item.get('flute_type', 'B-Flute'),
+            flute_type_2=first_item.get('fluteType2') or first_item.get('flute_type_2') or first_item.get('fluteType') or first_item.get('flute_type', 'B-Flute'),
             production_method=production_method,
-            carton_type=data.get('cartonType') or data.get('carton_type', 'RSC'),
-            die_length_mm=round(safe_float(data.get('dieLength') or data.get('die_length_mm', 0))),
-            die_width_mm=round(safe_float(data.get('dieWidth') or data.get('die_width_mm', 0))),
-            joining_type=data.get('joiningType'),
-            is_printed=data.get('isPrinted', False),
+            carton_type=first_item.get('cartonType') or first_item.get('carton_type', 'RSC'),
+            die_length_mm=round(safe_float(first_item.get('dieLength') or first_item.get('die_length_mm', 0))),
+            die_width_mm=round(safe_float(first_item.get('dieWidth') or first_item.get('die_width_mm', 0))),
+            joining_type=first_item.get('joiningType') or first_item.get('joining_type', 'Glued'),
+            is_printed=bool(first_item.get('isPrinted') or first_item.get('is_printed', False)),
             gsm_values=json.dumps(gsm_values),
-            white_liner_rate=safe_float(data.get('whiteLinerRate', 0)),
-            brown_liner_rate=safe_float(data.get('brownLinerRate', 0)),
+            white_liner_rate=safe_float(first_item.get('whiteLinerRate', data.get('whiteLinerRate', 0))),
+            brown_liner_rate=safe_float(first_item.get('brownLinerRate', data.get('brownLinerRate', 0))),
             total_overhead_for_order=total_overhead,
             overhead_per_carton=overhead_per_carton,
-            joining_cost=0.0 if (is_outsource or (data.get('cartonType') or data.get('carton_type')) == 'S.F.') else safe_float(data.get('joiningCost', 0)),
-            print_cost=0.0 if is_outsource else safe_float(data.get('printCost', 0)),
-            slotting_cost=0.0 if is_outsource else safe_float(data.get('slottingCost', 0)),
-            bundling_cost=0.0 if is_outsource else safe_float(data.get('bundlingCost', 0)),
-            diecutting_cost=0.0 if is_outsource else safe_float(data.get('diecuttingCost', 0)),
+            joining_cost=0.0 if (is_outsource or (first_item.get('cartonType') or first_item.get('carton_type')) == 'S.F.') else safe_float(first_item.get('joiningCost', data.get('joiningCost', 0))),
+            print_cost=0.0 if is_outsource else safe_float(first_item.get('printCost', data.get('printCost', 0))),
+            slotting_cost=0.0 if is_outsource else safe_float(first_item.get('slottingCost', data.get('slottingCost', 0))),
+            bundling_cost=0.0 if is_outsource else safe_float(first_item.get('bundlingCost', data.get('bundlingCost', 0))),
+            diecutting_cost=0.0 if is_outsource else safe_float(first_item.get('diecuttingCost', data.get('diecuttingCost', 0))),
             profit_margin_percent=safe_float(data.get('profitMargin', 15)),
-            tax_type=data.get('taxType'),
+            tax_type=data.get('taxType', 'Non-VAT'),
             delivery_required=data.get('deliveryRequired', False),
             delivery_location=data.get('deliveryLocation'),
             distance_km=safe_float(data.get('distanceKm', 0)),
@@ -539,10 +560,17 @@ def save_quote():
             block_making_cost=safe_float(data.get('oneTimeBlockCost') or data.get('block_making_cost') or 0),
             one_time_transport_cost=safe_float(data.get('oneTimeTransportCost') or data.get('one_time_transport_cost') or 0),
             payment_method=data.get('paymentMethod') or data.get('payment_method') or "Credit - 30 Days",
+            items=json.dumps(raw_items) if is_multi_item else json.dumps([data])
         )
         
-        # Add calculated costs if provided
-        if 'calculated_cost' in data:
+        # Add calculated costs
+        if is_multi_item:
+            quote.total_cost_batch = overall_batch_cost
+            if 'calculated_cost' in first_item:
+                calc = first_item['calculated_cost']
+                quote.final_cost_per_carton = calc.get('final', {}).get('final_cost_per_carton')
+                quote.subtotal_per_carton = calc.get('per_carton_costs', {}).get('subtotal')
+        elif 'calculated_cost' in data:
             calc = data['calculated_cost']
             quote.rm_cost_per_carton = calc.get('rates', {}).get('rm_cost_per_carton')
             quote.final_cost_per_carton = calc.get('final', {}).get('final_cost_per_carton')
@@ -593,6 +621,13 @@ def get_quote_history():
             else:
                 dim_display = f"{c_l}×{c_w}×{c_h} mm"
 
+            items_list = []
+            if getattr(quote, 'items', None):
+                try:
+                    items_list = json.loads(quote.items) if isinstance(quote.items, str) else quote.items
+                except Exception:
+                    items_list = []
+
             result.append({
                 'id': quote.id,
                 'quote_no': f"QT-{str(quote.id).zfill(5)}",
@@ -641,6 +676,8 @@ def get_quote_history():
                 'tax_type': quote.tax_type,
                 'final_cost_per_carton': quote.final_cost_per_carton,
                 'total_cost_batch': quote.total_cost_batch,
+                'items': items_list,
+                'item_count': len(items_list) if items_list else 1,
                 'created_at': quote.created_at.isoformat() + 'Z'
             })
         
@@ -660,6 +697,13 @@ def get_quote(quote_id):
         if not quote:
             return jsonify({'error': 'Quote not found'}), 404
         
+        items_list = []
+        if getattr(quote, 'items', None):
+            try:
+                items_list = json.loads(quote.items) if isinstance(quote.items, str) else quote.items
+            except Exception:
+                items_list = []
+
         return jsonify({
             'id': quote.id,
             'quote_no': f"QT-{str(quote.id).zfill(5)}",
@@ -727,7 +771,9 @@ def get_quote(quote_id):
                 'reel_waste_mm': quote.reel_waste_mm
             },
             'final_cost_per_carton': quote.final_cost_per_carton,
-            'total_cost_batch': quote.total_cost_batch
+            'total_cost_batch': quote.total_cost_batch,
+            'items': items_list,
+            'item_count': len(items_list) if items_list else 1
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
