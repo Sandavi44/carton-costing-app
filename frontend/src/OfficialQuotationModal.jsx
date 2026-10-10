@@ -55,7 +55,18 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
     const plyType = item.ply_type || item.plyType || '3-Ply';
     const cartonType = item.carton_type || item.cartonType || 'RSC';
 
-    let dimStr = item.dimensions;
+    let dimStr = (typeof item.dimensions === 'string' && !item.dimensions.includes('[object Object]')) ? item.dimensions : null;
+    if (!dimStr && typeof item.dimensions === 'object' && item.dimensions !== null) {
+      const l = item.dimensions.carton_length_mm || item.dimensions.length_mm || item.dimensions.length;
+      const w = item.dimensions.carton_width_mm || item.dimensions.width_mm || item.dimensions.width;
+      const h = item.dimensions.carton_height_mm || item.dimensions.height_mm || item.dimensions.height;
+      if (l && w && h) {
+        dimStr = `${Math.round(l)}×${Math.round(w)}×${Math.round(h)} mm`;
+      } else if (l && w) {
+        dimStr = `${Math.round(l)}×${Math.round(w)} mm`;
+      }
+    }
+
     if (!dimStr) {
       if (isSF) {
         if (dimUnit === 'inches') {
@@ -79,16 +90,16 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
             dimStr = `${lIn}×${wIn}×${hIn} inches`;
           }
         } else {
-          const lMm = Math.round(item.carton_length_mm || item.cartonLength || item.dimensions?.length_mm || 0);
-          const wMm = Math.round(item.carton_width_mm || item.cartonWidth || item.dimensions?.width_mm || 0);
-          const hMm = Math.round(item.carton_height_mm || item.cartonHeight || item.dimensions?.height_mm || 0);
+          const lMm = Math.round(item.carton_length_mm || item.cartonLength || item.dimensions?.carton_length_mm || item.dimensions?.length_mm || item.dimensions?.length || 0);
+          const wMm = Math.round(item.carton_width_mm || item.cartonWidth || item.dimensions?.carton_width_mm || item.dimensions?.width_mm || item.dimensions?.width || 0);
+          const hMm = Math.round(item.carton_height_mm || item.cartonHeight || item.dimensions?.carton_height_mm || item.dimensions?.height_mm || item.dimensions?.height || 0);
           dimStr = `${lMm}×${wMm}×${hMm} mm`;
         }
       }
     }
 
     const plyClean = plyType.replace('-', ' ');
-    let descStr = item.description;
+    let descStr = (typeof item.description === 'string' && !item.description.includes('[object Object]')) ? item.description : null;
     if (!descStr) {
       if (isSF) {
         const isSheet = plyType === '2-Ply' || plyType === '4-Ply';
@@ -96,10 +107,17 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
         descStr = `${dimStr} - ${plyClean} ${productNoun} - S.F.`;
       } else {
         const productNoun = isPrinted ? 'Printed Carton' : 'Carton';
-        const typeStr = cartonType ? `${cartonType} Type` : 'RSC Type';
+        const typeStr = cartonType ? (cartonType.toLowerCase().includes('type') ? cartonType : `${cartonType} Type`) : 'RSC Type';
         descStr = `${dimStr} - ${plyClean} ${productNoun} - ${typeStr}`;
       }
     }
+
+    // Optional Die Size string for die-cut cartons
+    const dieLen = parseFloat(item.die_length_mm || item.dieLength || 0);
+    const dieWid = parseFloat(item.die_width_mm || item.dieWidth || 0);
+    const dieSizeStr = (!isSF && dieLen > 0 && dieWid > 0)
+      ? `Die Size: ${Math.round(dieLen)} × ${Math.round(dieWid)} mm`
+      : null;
 
     const formatFluteName = (f) => {
       if (!f) return '';
@@ -129,6 +147,7 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
 
     return {
       descStr,
+      dieSizeStr,
       printTypeDisplay,
       fluteDisplay,
       boardDisplay,
@@ -341,40 +360,54 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
             style={{ color: '#111827' }}
           >
             {/* Header: Company Info based on VAT or Non-VAT */}
-            <div className="border-b-2 border-gray-900 pb-4 mb-4 flex justify-between items-start gap-4">
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-gray-900 leading-tight">
-                  {isVatCustomer ? 'Chelsy Packaging Solutions (Pvt) Ltd.' : 'Chelsy Packaging Pvt Ltd'}
-                </h1>
-                <p className="text-xs text-gray-600 mt-1 font-medium leading-relaxed">
-                  Manufacturers of High Quality Corrugated Cartons & Paper Products<br />
-                  Factory: 366/4, Balummahara, Mudungoda.<br />
-                  Office: 202/10, Colombo Road, Biyagama.<br />
-                  Hotline: 0773 888 692 | 077 206 7268 | Email: info@chelsypackaging.com
-                </p>
-                {isVatCustomer && (
-                  <p className="text-xs font-bold text-gray-900 mt-1">
-                    VAT Registration No: <span className="font-mono">103429295-7000</span>
-                  </p>
-                )}
-              </div>
-              <div className="text-right shrink-0">
-                <span className="inline-block bg-gray-900 text-white font-black text-xs px-3 py-1.5 rounded-md uppercase tracking-wider mb-2">
-                  {isVatCustomer ? 'TAX QUOTATION' : 'QUOTATION'}
-                </span>
-                <p className="text-xs font-semibold text-gray-500">Date: <span className="text-gray-900 font-bold">{displayDate}</span></p>
-                <p className="text-xs font-semibold text-gray-500">Quote No: <span className="text-gray-900 font-mono font-bold">{displayQuoteNo}</span></p>
-              </div>
-            </div>
+            <div className="border-b-2 border-gray-900 pb-4 mb-4">
+              <div className="flex justify-between items-start gap-4">
+                {/* Left: 3D Cube Logo + Company Address */}
+                <div className="flex items-start gap-3 sm:gap-4">
+                  {/* 3D Isometric Cube Packaging Logo */}
+                  <svg className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 drop-shadow-xs" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="24,5 43,15.5 24,26 5,15.5" fill="#15803d" stroke="#ffffff" strokeWidth="0.75" />
+                    <polygon points="5,15.5 24,26 24,42 5,31.5" fill="#b91c1c" stroke="#ffffff" strokeWidth="0.75" />
+                    <polygon points="24,26 43,15.5 43,31.5 24,42" fill="#1d4ed8" stroke="#ffffff" strokeWidth="0.75" />
+                    <line x1="24" y1="5" x2="24" y2="26" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeDasharray="2 1" />
+                  </svg>
+                  <div>
+                    <h1 className="text-base sm:text-lg font-black tracking-tight text-gray-900 leading-tight">
+                      {isVatCustomer ? 'CHELSY PACKAGING SOLUTIONS (PVT) LTD.' : 'CHELSY PACKAGING PRIVATE LTD.'}
+                    </h1>
+                    <p className="text-xs text-gray-700 mt-1 font-medium leading-relaxed">
+                      {isVatCustomer 
+                        ? 'No 234/1/A, Siyambalape South, Siyambalape, Biyagama.'
+                        : 'No 234/1/A, Siyambalape South, Siyambalape, Sri Lanka.'
+                      }
+                      <br />
+                      {isVatCustomer ? '+94 0112 487486' : 'Phone: +94 0112 487486'}
+                    </p>
+                  </div>
+                </div>
 
-            {/* Customer Information Block */}
-            <div className="mb-5 bg-gray-50 rounded-xl p-3 sm:p-4 border border-gray-200">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-gray-500 block mb-1">
-                Quotation Prepared For:
-              </span>
-              <p className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                {quote.customer_name}
-              </p>
+                {/* Right: Quotation & Tax Category */}
+                <div className="text-right shrink-0">
+                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-gray-900 leading-none">
+                    Quotation
+                  </h2>
+                  <p className="text-xs font-bold text-gray-600 mt-1 uppercase tracking-wider">
+                    {isVatCustomer ? 'VAT CUSTOMER' : 'NON-VAT CUSTOMER'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer & Quote Details Subheader Bar */}
+              <div className="mt-4 pt-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
+                <div>
+                  <span className="font-bold text-gray-500">Customer: </span>
+                  <span className="font-black text-gray-900 text-sm">{quote.customer_name}</span>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-semibold text-gray-600">
+                  <p>Date: <span className="text-gray-900 font-bold">{displayDate}</span></p>
+                  <p>Quotation Number: <span className="text-gray-900 font-mono font-bold">{displayQuoteNo}</span></p>
+                </div>
+              </div>
             </div>
 
             {/* Official Order Quotation Items Table */}
@@ -382,12 +415,12 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
               <table className="w-full border-collapse border border-gray-300 text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-gray-100 text-gray-900 border-b border-gray-300 font-bold text-[11px] sm:text-xs">
-                    <th className="py-2.5 px-3 text-center border-r border-gray-300 w-10">#</th>
-                    <th className="py-2.5 px-4 text-left border-r border-gray-300">Description</th>
-                    <th className="py-2.5 px-3 text-right border-r border-gray-300 w-24">Qty</th>
-                    <th className="py-2.5 px-3 text-center border-r border-gray-300 w-16">Unit</th>
-                    <th className="py-2.5 px-3 text-right border-r border-gray-300 w-24">Price</th>
-                    <th className="py-2.5 px-4 text-right w-28">Amount</th>
+                    <th className="py-2 px-3 text-center border-r border-gray-300 w-12">S.N</th>
+                    <th className="py-2 px-4 text-left border-r border-gray-300">Description</th>
+                    <th className="py-2 px-3 text-right border-r border-gray-300 w-24">QTY</th>
+                    <th className="py-2 px-3 text-center border-r border-gray-300 w-16">Unit</th>
+                    <th className="py-2 px-3 text-right border-r border-gray-300 w-24">Price</th>
+                    <th className="py-2 px-4 text-right w-28">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -396,6 +429,11 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
                       <td className="py-3 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{idx + 1}</td>
                       <td className="py-3 px-4 font-semibold text-gray-900 border-r border-gray-300">
                         <div>{item.descStr}</div>
+                        {item.dieSizeStr && (
+                          <div className="text-[11px] text-gray-600 font-normal mt-0.5">
+                            {item.dieSizeStr}
+                          </div>
+                        )}
                         <div className="text-[11px] text-gray-600 font-normal mt-1 space-y-0.5">
                           <div><span className="font-semibold text-gray-700">Print Type:</span> {item.printTypeDisplay}</div>
                           <div><span className="font-semibold text-gray-700">Flute Type:</span> {item.fluteDisplay}</div>
@@ -537,7 +575,7 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
             <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-600 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
               <div className="space-y-2">
                 <p className="font-bold text-gray-800 text-sm">
-                  {isVatCustomer ? 'Chelsy Packaging Solutions (Pvt) Ltd.' : 'Chelsy Packaging Pvt Ltd'}
+                  {isVatCustomer ? 'CHELSY PACKAGING SOLUTIONS (PVT) LTD.' : 'CHELSY PACKAGING PRIVATE LTD.'}
                 </p>
                 
                 {/* Special Conditions / Terms */}

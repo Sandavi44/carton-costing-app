@@ -239,7 +239,6 @@ def seed_or_update_default_users():
                 db.session.add(u)
             else:
                 u.username = conf['username']
-                u.password_hash = conf.get('password_hash') or u.password_hash
                 u.is_admin = conf['is_admin']
             db.session.commit()
         except Exception:
@@ -353,6 +352,38 @@ def login():
             }
         }), 200
     except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/auth/change-password', methods=['POST'])
+@jwt_required()
+def change_password():
+    """Allow logged in user to redefine their password"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.get_json() or {}
+        current_password = str(data.get('current_password', '')).strip()
+        new_password = str(data.get('new_password', '')).strip()
+
+        if not current_password or not new_password:
+            return jsonify({'error': 'Current password and new password are required'}), 400
+
+        if not user.check_password(current_password):
+            return jsonify({'error': 'Incorrect current password'}), 400
+
+        if len(new_password) < 4:
+            return jsonify({'error': 'New password must be at least 4 characters long'}), 400
+
+        user.set_password(new_password)
+        db.session.commit()
+
+        return jsonify({'message': 'Password redefined successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
 

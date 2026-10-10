@@ -5,6 +5,7 @@ import CostingApp from './CostingApp';
 import QuoteHistory from './QuoteHistory';
 import SystemParameters from './SystemParameters';
 import CalculationSteps from './CalculationSteps';
+import ChangePasswordModal from './ChangePasswordModal';
 
 // Configure Axios defaults
 // - Local dev:  VITE_API_URL is empty → Vite proxies /api → http://localhost:5000
@@ -15,6 +16,7 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('access_token'));
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('calculator');
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Shared state for costing calculations to expose to multiple tabs
   const [formData, setFormData] = useState({
@@ -288,6 +290,21 @@ function App() {
                 )}
               </span>
               <button
+                type="button"
+                onClick={() => setShowChangePasswordModal(true)}
+                title="Redefine your account password"
+                className={`font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm border transition duration-150 cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  isDark
+                    ? 'bg-[#1a2332] border-[#c5a880]/30 text-amber-200/90 hover:bg-[#253046]'
+                    : isSand
+                      ? 'bg-[#f4efe5] border-[#dfd5bc] text-[#5c4c36] hover:bg-[#eae3d4]'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                }`}
+              >
+                <span>🔑</span>
+                <span className="hidden sm:inline">Change Password</span>
+              </button>
+              <button
                 onClick={handleLogout}
                 className={`font-semibold px-3 sm:px-4 py-2 rounded-lg text-sm border transition duration-150 cursor-pointer ${
                   isDark
@@ -331,6 +348,15 @@ function App() {
         )}
         {activeTab === 'parameters' && <SystemParameters theme={theme} />}
       </main>
+
+      {/* Change Password Modal */}
+      {showChangePasswordModal && (
+        <ChangePasswordModal 
+          user={user} 
+          onClose={() => setShowChangePasswordModal(false)} 
+          theme={theme} 
+        />
+      )}
     </div>
   );
 }
