@@ -176,6 +176,7 @@ class Quote(db.Model):
     third_party_commission = db.Column(db.Float, default=0.0)
     has_transport = db.Column(db.Boolean, default=False)
     transport_cost = db.Column(db.Float, default=0.0)
+    transport_option = db.Column(db.String(100), default="Ex factory price from Biyagama factory ( No transport)")
     
     # Tax
     tax_type = db.Column(db.String(50), nullable=False)
@@ -229,6 +230,7 @@ def ensure_db_columns_exist():
                 ("carton_height_input", "VARCHAR(50)"),
                 ("die_length_input", "VARCHAR(50)"),
                 ("die_width_input", "VARCHAR(50)"),
+                ("transport_option", "VARCHAR(100) DEFAULT 'Ex factory price from Biyagama factory ( No transport)'"),
             ]
             is_postgres = db.engine.dialect.name == 'postgresql'
             for col_name, col_type in migration_cols:
@@ -428,7 +430,7 @@ def calculate_cost():
             brown_liner_rate=req_brown,
             gsm_values=gsm_values,
             total_overhead_for_order=0.0 if is_outsource else safe_float(data.get('total_overhead_for_order', 0)),
-            joining_cost=0.0 if is_outsource else safe_float(data.get('joining_cost', 0)),
+            joining_cost=0.0 if (is_outsource or (data.get('carton_type') or data.get('cartonType')) == 'S.F.') else safe_float(data.get('joining_cost', 0)),
             print_cost=0.0 if is_outsource else (safe_float(data.get('print_cost', 0)) if data.get('is_printed') else 0),
             slotting_cost=0.0 if is_outsource else safe_float(data.get('slotting_cost', 0)),
             bundling_cost=0.0 if is_outsource else safe_float(data.get('bundling_cost', 0)),
@@ -517,7 +519,7 @@ def save_quote():
             brown_liner_rate=safe_float(data.get('brownLinerRate', 0)),
             total_overhead_for_order=total_overhead,
             overhead_per_carton=overhead_per_carton,
-            joining_cost=0.0 if is_outsource else safe_float(data.get('joiningCost', 0)),
+            joining_cost=0.0 if (is_outsource or (data.get('cartonType') or data.get('carton_type')) == 'S.F.') else safe_float(data.get('joiningCost', 0)),
             print_cost=0.0 if is_outsource else safe_float(data.get('printCost', 0)),
             slotting_cost=0.0 if is_outsource else safe_float(data.get('slottingCost', 0)),
             bundling_cost=0.0 if is_outsource else safe_float(data.get('bundlingCost', 0)),
@@ -532,6 +534,7 @@ def save_quote():
             third_party_commission=safe_float(data.get('thirdPartyCommission', 0)),
             has_transport=data.get('hasTransport', False),
             transport_cost=safe_float(data.get('transportCost', 0)),
+            transport_option=data.get('transportOption') or data.get('transport_option') or ('Including transport' if data.get('hasTransport') else 'Ex factory price from Biyagama factory ( No transport)'),
             die_making_cost=safe_float(data.get('oneTimeDieCost') or data.get('die_making_cost') or 0),
             block_making_cost=safe_float(data.get('oneTimeBlockCost') or data.get('block_making_cost') or 0),
             one_time_transport_cost=safe_float(data.get('oneTimeTransportCost') or data.get('one_time_transport_cost') or 0),
@@ -616,6 +619,25 @@ def get_quote_history():
                 'one_time_transport_cost': getattr(quote, 'one_time_transport_cost', 0.0) or 0.0,
                 'payment_method': getattr(quote, 'payment_method', 'Credit - 30 Days') or 'Credit - 30 Days',
                 'quantity': quote.quantity,
+                'is_printed': bool(quote.is_printed),
+                'joining_type': quote.joining_type,
+                'joining_cost': quote.joining_cost,
+                'print_cost': quote.print_cost,
+                'slotting_cost': quote.slotting_cost,
+                'bundling_cost': quote.bundling_cost,
+                'diecutting_cost': quote.diecutting_cost,
+                'total_overhead_for_order': quote.total_overhead_for_order,
+                'overhead_per_carton': quote.overhead_per_carton,
+                'white_liner_rate': quote.white_liner_rate,
+                'brown_liner_rate': quote.brown_liner_rate,
+                'gsm_values': json.loads(quote.gsm_values) if quote.gsm_values else [],
+                'has_transport': bool(quote.has_transport),
+                'transport_cost': quote.transport_cost,
+                'transport_option': getattr(quote, 'transport_option', None) or ('Including transport' if quote.has_transport else 'Ex factory price from Biyagama factory ( No transport)'),
+                'has_inhouse_commission': quote.has_inhouse_commission,
+                'has_third_party_commission': quote.has_third_party_commission,
+                'third_party_commission': quote.third_party_commission,
+                'profit_margin_percent': quote.profit_margin_percent,
                 'tax_type': quote.tax_type,
                 'final_cost_per_carton': quote.final_cost_per_carton,
                 'total_cost_batch': quote.total_cost_batch,
@@ -682,6 +704,7 @@ def get_quote(quote_id):
             'third_party_commission': quote.third_party_commission,
             'has_transport': quote.has_transport,
             'transport_cost': quote.transport_cost,
+            'transport_option': getattr(quote, 'transport_option', None) or ('Including transport' if quote.has_transport else 'Ex factory price from Biyagama factory ( No transport)'),
             'die_making_cost': getattr(quote, 'die_making_cost', 0.0) or 0.0,
             'block_making_cost': getattr(quote, 'block_making_cost', 0.0) or 0.0,
             'one_time_transport_cost': getattr(quote, 'one_time_transport_cost', 0.0) or 0.0,
@@ -963,6 +986,7 @@ def init_db():
             ("block_making_cost", "FLOAT DEFAULT 0.0"),
             ("one_time_transport_cost", "FLOAT DEFAULT 0.0"),
             ("payment_method", "VARCHAR(100) DEFAULT 'Credit - 30 Days'"),
+            ("transport_option", "VARCHAR(100) DEFAULT 'Ex factory price from Biyagama factory ( No transport)'"),
         ]:
             for tbl in ["quote", "quotes"]:
                 try:

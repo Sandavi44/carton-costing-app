@@ -389,7 +389,9 @@ export const getProposedCosts = (carton, category, isTwoUp = false, rates = {}) 
 
   // 1. Joining Cost
   let proposedJoining = 0;
-  if (carton.joiningType === 'Stitched') {
+  if (carton.cartonType === 'S.F.') {
+    proposedJoining = 0;
+  } else if (carton.joiningType === 'Stitched') {
     const h = parseFloat(carton.cartonHeight) || 0;
     proposedJoining = h > 0 ? Math.max(0, parseFloat((((h / 25) - 1) * 2).toFixed(2))) : 0;
   } else {
@@ -400,7 +402,7 @@ export const getProposedCosts = (carton, category, isTwoUp = false, rates = {}) 
   }
 
   // If 2-Up method (RSC carton with sheet length > 1938 mm): multiply joining cost by 1.5
-  if (isTwoUp) {
+  if (carton.cartonType !== 'S.F.' && isTwoUp) {
     proposedJoining = parseFloat((proposedJoining * 1.5).toFixed(2));
   }
 
@@ -543,6 +545,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         updated.gsm1 = '140';
         updated.gsm2 = '112';
         updated.gsm3 = '140';
+        changed = true;
+      }
+      if (updated.plyType === '4-Ply' && (!updated.gsm1 && !updated.gsm2 && !updated.gsm3 && !updated.gsm4)) {
+        updated.gsm1 = '140';
+        updated.gsm2 = '112';
+        updated.gsm3 = '140';
+        updated.gsm4 = '112';
         changed = true;
       }
       if (updated.plyType === '5-Ply' && (!updated.gsm1 && !updated.gsm2 && !updated.gsm3)) {
@@ -728,6 +737,10 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           updated.slottingCost = '';
           updated.slottingCostManual = false;
         }
+        if (value === 'S.F.') {
+          updated.joiningCost = '0.00';
+          updated.joiningCostManual = false;
+        }
       }
       if (name === 'plyType') {
         updated.slottingCostManual = false;
@@ -744,6 +757,14 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           updated.gsm2 = '112';
           updated.gsm3 = '140';
           updated.gsm4 = '';
+          updated.gsm5 = '';
+          updated.gsm6 = '';
+          updated.gsm7 = '';
+        } else if (value === '4-Ply') {
+          updated.gsm1 = '140';
+          updated.gsm2 = '112';
+          updated.gsm3 = '140';
+          updated.gsm4 = '112';
           updated.gsm5 = '';
           updated.gsm6 = '';
           updated.gsm7 = '';
@@ -780,6 +801,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
           { name: 'gsm1', label: 'Outer 1 (Liner)', value: formData.gsm1 },
           { name: 'gsm2', label: 'Flute', value: formData.gsm2 },
           { name: 'gsm3', label: 'Outer 2 (Liner)', value: formData.gsm3 },
+        ];
+      case '4-Ply':
+        return [
+          { name: 'gsm1', label: 'Outer 1 (Liner)', value: formData.gsm1 },
+          { name: 'gsm2', label: 'Flute 1', value: formData.gsm2 },
+          { name: 'gsm3', label: 'Liner 2', value: formData.gsm3 },
+          { name: 'gsm4', label: 'Flute 2', value: formData.gsm4 },
         ];
       case '5-Ply':
         return [
@@ -863,7 +891,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         brown_liner_rate: parseFloat(formData.brownLinerRate || 0),
         gsm_values: gsmArray,
         total_overhead_for_order: isOutsource ? 0 : parseFloat(formData.totalOverheadForOrder || 0),
-        joining_cost: isOutsource ? 0 : parseFloat(formData.joiningCost !== '' && formData.joiningCost !== undefined ? formData.joiningCost : (proposedJoining || 0)),
+        joining_cost: (isOutsource || formData.cartonType === 'S.F.') ? 0 : parseFloat(formData.joiningCost !== '' && formData.joiningCost !== undefined ? formData.joiningCost : (proposedJoining || 0)),
         joining_cost_glued_s: systemRates.joiningCostGluedS,
         joining_cost_glued_m: systemRates.joiningCostGluedM,
         joining_cost_glued_l: systemRates.joiningCostGluedL,
@@ -878,6 +906,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         thirdPartyCommission: parseFloat(formData.thirdPartyCommission || 0),
         hasTransport: formData.hasTransport,
         transportCost: parseFloat(formData.transportCost || 0),
+        transport_option: formData.transportOption || (formData.hasTransport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
       };
 
       const response = await axios.post('/api/quotes/calculate', payload, {
@@ -949,11 +978,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         die_length_input: String(formData.dieLength || ''),
         die_width_input: String(formData.dieWidth || ''),
         totalOverheadForOrder: isOutsource ? 0 : (formData.totalOverheadForOrder || 0),
-        joiningCost: isOutsource ? 0 : formData.joiningCost,
+        joiningCost: (isOutsource || formData.cartonType === 'S.F.') ? 0 : formData.joiningCost,
         printCost: isOutsource ? 0 : formData.printCost,
         slottingCost: isOutsource ? 0 : formData.slottingCost,
         bundlingCost: isOutsource ? 0 : formData.bundlingCost,
         diecuttingCost: isOutsource ? 0 : formData.diecuttingCost,
+        transport_option: formData.transportOption || (formData.hasTransport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
+        transportOption: formData.transportOption || (formData.hasTransport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
         oneTimeDieCost: formData.oneTimeDieCost || '',
         oneTimeBlockCost: formData.oneTimeBlockCost || '',
         oneTimeTransportCost: formData.oneTimeTransportCost || '',
@@ -1176,7 +1207,14 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         
         {/* Horizontal Sequential Spaces for L, W, H with Unit Click-Box Selector */}
         <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
-          <label className={labelClass}>Carton Dimensions</label>
+          <div className="flex items-center gap-2">
+            <label className={labelClass}>Carton Dimensions</label>
+            {formData.cartonType === 'S.F.' && (
+              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                (Inactive for S.F. — Use Die Size above)
+              </span>
+            )}
+          </div>
           {/* Click box for mm / inches */}
           <div className={`flex items-center gap-1 p-1 rounded-xl border text-xs font-bold ${
             isDark ? 'bg-slate-800/80 border-slate-700' : isSand ? 'bg-[#faf8f5] border-[#dfd5bc]' : 'bg-[#eaf5ea] border-[#bbf7d0]'
@@ -1215,10 +1253,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               type="number"
               step={dimUnit === 'inches' ? '0.01' : '1'}
               name="cartonLength"
-              placeholder={dimUnit === 'inches' ? 'e.g. 19.69' : 'L (mm)'}
-              value={formData.cartonLength}
+              placeholder={formData.cartonType === 'S.F.' ? 'N/A for S.F.' : (dimUnit === 'inches' ? 'e.g. 19.69' : 'L (mm)')}
+              value={formData.cartonType === 'S.F.' ? '' : formData.cartonLength}
               onChange={handleInputChange}
-              className={inputClass}
+              disabled={formData.cartonType === 'S.F.'}
+              className={`${inputClass} ${formData.cartonType === 'S.F.' ? 'opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
             />
           </div>
           <div>
@@ -1227,10 +1266,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               type="number"
               step={dimUnit === 'inches' ? '0.01' : '1'}
               name="cartonWidth"
-              placeholder={dimUnit === 'inches' ? 'e.g. 11.81' : 'W (mm)'}
-              value={formData.cartonWidth}
+              placeholder={formData.cartonType === 'S.F.' ? 'N/A for S.F.' : (dimUnit === 'inches' ? 'e.g. 11.81' : 'W (mm)')}
+              value={formData.cartonType === 'S.F.' ? '' : formData.cartonWidth}
               onChange={handleInputChange}
-              className={inputClass}
+              disabled={formData.cartonType === 'S.F.'}
+              className={`${inputClass} ${formData.cartonType === 'S.F.' ? 'opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
             />
           </div>
           <div>
@@ -1239,10 +1279,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               type="number"
               step={dimUnit === 'inches' ? '0.01' : '1'}
               name="cartonHeight"
-              placeholder={dimUnit === 'inches' ? 'e.g. 7.87' : 'H (mm)'}
-              value={formData.cartonHeight}
+              placeholder={formData.cartonType === 'S.F.' ? 'N/A for S.F.' : (dimUnit === 'inches' ? 'e.g. 7.87' : 'H (mm)')}
+              value={formData.cartonType === 'S.F.' ? '' : formData.cartonHeight}
               onChange={handleInputChange}
-              className={inputClass}
+              disabled={formData.cartonType === 'S.F.'}
+              className={`${inputClass} ${formData.cartonType === 'S.F.' ? 'opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
             />
           </div>
         </div>
@@ -1298,19 +1339,20 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       <div className={`${cardClass} mb-6`}>
         <h3 className={headingClass}>📊 Material Type</h3>
         
-        <div className={`grid gap-4 ${formData.plyType === '5-Ply' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
+        <div className={`grid gap-4 ${(formData.plyType === '5-Ply' || formData.plyType === '4-Ply') ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
           <div>
             <label className={labelClass}>Ply Type</label>
             <select name="plyType" value={formData.plyType} onChange={handleInputChange} className={selectClass}>
               <option value="2-Ply">2-Ply</option>
               <option value="3-Ply">3-Ply</option>
+              <option value="4-Ply">4-Ply</option>
               <option value="5-Ply">5-Ply</option>
               <option value="7-Ply">7-Ply</option>
             </select>
           </div>
           
           <div>
-            <label className={labelClass}>{formData.plyType === '5-Ply' || formData.plyType === '2-Ply' ? 'Flute Type 1' : 'Flute Type'}</label>
+            <label className={labelClass}>{formData.plyType === '5-Ply' || formData.plyType === '4-Ply' || formData.plyType === '2-Ply' ? 'Flute Type 1' : 'Flute Type'}</label>
             <select name="fluteType" value={formData.fluteType} onChange={handleInputChange} className={selectClass}>
               <option value="B-Flute">B-Flute (1.35)</option>
               <option value="C-Flute">C-Flute (1.43)</option>
@@ -1318,7 +1360,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             </select>
           </div>
 
-          {formData.plyType === '5-Ply' && (
+          {(formData.plyType === '5-Ply' || formData.plyType === '4-Ply') && (
             <div>
               <label className={labelClass}>Flute Type 2</label>
               <select name="fluteType2" value={formData.fluteType2 || 'B-Flute'} onChange={handleInputChange} className={selectClass}>
@@ -1435,7 +1477,13 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className={labelClass}>Joining Method</label>
-                <select name="joiningType" value={formData.joiningType} onChange={handleInputChange} className={selectClass}>
+                <select 
+                  name="joiningType" 
+                  value={formData.joiningType} 
+                  onChange={handleInputChange} 
+                  disabled={formData.cartonType === 'S.F.'}
+                  className={`${selectClass} ${formData.cartonType === 'S.F.' ? 'opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
+                >
                   <option value="Glued">Glued</option>
                   <option value="Stitched">Stitched</option>
                 </select>
@@ -1444,8 +1492,10 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className={labelClass}>Joining Cost (Rs./carton)</label>
-                  <span className="text-xxs font-semibold text-blue-500 dark:text-blue-400">
-                    {formData.joiningType === 'Stitched'
+                  <span className={`text-xxs font-semibold ${formData.cartonType === 'S.F.' ? 'text-amber-500 font-bold' : 'text-blue-500 dark:text-blue-400'}`}>
+                    {formData.cartonType === 'S.F.'
+                      ? 'Auto: Rs. 0.00 (Inactive for S.F.)'
+                      : formData.joiningType === 'Stitched'
                       ? `Auto: Rs. ${proposedJoining.toFixed(2)} ([(H/25)-1]×2${currentIsTwoUp ? ' × 1.5 [2-Up]' : ''})`
                       : `Auto: Rs. ${proposedJoining.toFixed(2)} (Type ${currentCategory}${currentIsTwoUp ? ' × 1.5 [2-Up]' : ''})`}
                   </span>
@@ -1454,13 +1504,14 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
                   <input
                     type="number"
                     name="joiningCost"
-                    placeholder="e.g. 2.00"
-                    value={formData.joiningCost}
+                    placeholder={formData.cartonType === 'S.F.' ? '0.00' : 'e.g. 2.00'}
+                    value={formData.cartonType === 'S.F.' ? '0.00' : formData.joiningCost}
                     onChange={handleInputChange}
-                    className={inputClass}
+                    disabled={formData.cartonType === 'S.F.'}
+                    className={`${inputClass} ${formData.cartonType === 'S.F.' ? 'opacity-40 cursor-not-allowed bg-gray-100 dark:bg-slate-800' : ''}`}
                     step="0.01"
                   />
-                  {formData.joiningCostManual && (
+                  {formData.cartonType !== 'S.F.' && formData.joiningCostManual && (
                     <button
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, joiningCostManual: false, joiningCost: proposedJoining.toFixed(2) }))}
@@ -1686,27 +1737,44 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               ? 'bg-white border-[#dfd5bc] text-[#5c4c36]'
               : 'bg-[#ffffff]/90 border-[#c8e6c9] text-[#14532d]'
         }`}>
-          <span className={labelClass}>Is there any transport cost?</span>
-          <div className="flex gap-4 mb-3 text-sm mt-1">
-            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <span className={labelClass}>Transport Option</span>
+          <div className="flex flex-col sm:flex-row gap-2.5 mb-3 text-sm mt-1">
+            <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-all ${
+              formData.hasTransport
+                ? (isDark ? 'bg-emerald-950/40 border-emerald-500 font-bold text-emerald-300 shadow-xs' : 'bg-emerald-50 border-emerald-500 font-bold text-emerald-800 shadow-xs')
+                : (isDark ? 'border-slate-700/60 opacity-70 hover:opacity-100' : 'border-gray-200 opacity-70 hover:opacity-100')
+            }`}>
               <input
                 type="radio"
-                name="hasTransport"
+                name="transportOption"
                 checked={formData.hasTransport === true}
-                onChange={() => setFormData(prev => ({ ...prev, hasTransport: true }))}
-                className="w-4 h-4 cursor-pointer"
+                onChange={() => setFormData(prev => ({ 
+                  ...prev, 
+                  hasTransport: true, 
+                  transportOption: 'Including transport' 
+                }))}
+                className="w-4 h-4 cursor-pointer text-emerald-600"
               />
-              Yes
+              Including transport
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-all ${
+              !formData.hasTransport
+                ? (isDark ? 'bg-emerald-950/40 border-emerald-500 font-bold text-emerald-300 shadow-xs' : 'bg-emerald-50 border-emerald-500 font-bold text-emerald-800 shadow-xs')
+                : (isDark ? 'border-slate-700/60 opacity-70 hover:opacity-100' : 'border-gray-200 opacity-70 hover:opacity-100')
+            }`}>
               <input
                 type="radio"
-                name="hasTransport"
+                name="transportOption"
                 checked={formData.hasTransport === false}
-                onChange={() => setFormData(prev => ({ ...prev, hasTransport: false, transportCost: '' }))}
-                className="w-4 h-4 cursor-pointer"
+                onChange={() => setFormData(prev => ({ 
+                  ...prev, 
+                  hasTransport: false, 
+                  transportCost: '', 
+                  transportOption: 'Ex factory price from Biyagama factory ( No transport)' 
+                }))}
+                className="w-4 h-4 cursor-pointer text-emerald-600"
               />
-              No
+              Ex factory price from Biyagama factory ( No transport)
             </label>
           </div>
           

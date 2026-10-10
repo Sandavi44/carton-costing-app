@@ -13,9 +13,10 @@ import math
 # ============================================================================
 
 class PlyType(Enum):
-    """Ply types: 2-Ply, 3-Ply, 5-Ply, 7-Ply"""
+    """Ply types: 2-Ply, 3-Ply, 4-Ply, 5-Ply, 7-Ply"""
     TWO_PLY = "2-Ply"
     THREE_PLY = "3-Ply"
+    FOUR_PLY = "4-Ply"
     FIVE_PLY = "5-Ply"
     SEVEN_PLY = "7-Ply"
 
@@ -62,6 +63,7 @@ REEL_EDGE_LOSS_MM = 25  # 12.5mm top + 12.5mm bottom
 SHEET_LENGTH_FORMULAS = {
     "2-Ply": lambda L, W: (L + W) * 2 + 62,
     "3-Ply": lambda L, W: (L + W) * 2 + 62,
+    "4-Ply": lambda L, W: (L + W) * 2 + 65,
     "5-Ply": lambda L, W: (L + W) * 2 + 75,
     "7-Ply": lambda L, W: (L + W) * 2 + 75,
 }
@@ -70,6 +72,7 @@ SHEET_LENGTH_FORMULAS = {
 SHEET_WIDTH_ADJUSTMENTS = {
     "2-Ply": 26,
     "3-Ply": 26,
+    "4-Ply": 30,
     "5-Ply": 32,
     "7-Ply": 36,
 }
@@ -231,22 +234,27 @@ class CostingCalculator:
         # Glued: S -> 3.00, M -> 4.50, L -> 6.00
         # Stitched: [(Carton Height / 25) - 1] * 2
         # If 2-Up method (RSC carton with sheet length > 1938 mm): multiply joining cost by 1.5
-        is_two_up = getattr(self, 'is_two_up', False)
-        if self.params.joining_type == "Stitched":
-            h = getattr(self.params, 'carton_height_mm', 0.0)
-            base_joining_cost = max(0.0, round(((h / 25.0) - 1.0) * 2.0, 2)) if h > 0 else 0.0
+        # If S.F.: joining cost is inactive and considered as zero (0.00)
+        carton_type = getattr(self.params, 'carton_type', 'RSC')
+        if carton_type == "S.F.":
+            proposed_joining_cost = 0.0
         else:
-            rate_s = getattr(self.params, 'joining_cost_glued_s', 3.00)
-            rate_m = getattr(self.params, 'joining_cost_glued_m', 4.50)
-            rate_l = getattr(self.params, 'joining_cost_glued_l', 6.00)
-            if carton_category == "S":
-                base_joining_cost = rate_s
-            elif carton_category == "M":
-                base_joining_cost = rate_m
+            is_two_up = getattr(self, 'is_two_up', False)
+            if self.params.joining_type == "Stitched":
+                h = getattr(self.params, 'carton_height_mm', 0.0)
+                base_joining_cost = max(0.0, round(((h / 25.0) - 1.0) * 2.0, 2)) if h > 0 else 0.0
             else:
-                base_joining_cost = rate_l
-        
-        proposed_joining_cost = round(base_joining_cost * 1.5, 2) if is_two_up else base_joining_cost
+                rate_s = getattr(self.params, 'joining_cost_glued_s', 3.00)
+                rate_m = getattr(self.params, 'joining_cost_glued_m', 4.50)
+                rate_l = getattr(self.params, 'joining_cost_glued_l', 6.00)
+                if carton_category == "S":
+                    base_joining_cost = rate_s
+                elif carton_category == "M":
+                    base_joining_cost = rate_m
+                else:
+                    base_joining_cost = rate_l
+            
+            proposed_joining_cost = round(base_joining_cost * 1.5, 2) if is_two_up else base_joining_cost
 
         # (2) Printing cost:
         # If is_printed: S -> 3.00, M -> 4.00, L -> 6.00; else 0.0
@@ -292,7 +300,7 @@ class CostingCalculator:
             diecutting_cost = 0.0
         else:
             overhead_per_carton = self.params.total_overhead_for_order / self.params.quantity if self.params.quantity > 0 else 0.0
-            joining_cost = self.params.joining_cost if (self.params.joining_cost is not None and self.params.joining_cost > 0) else proposed_joining_cost
+            joining_cost = 0.0 if carton_type == "S.F." else (self.params.joining_cost if (self.params.joining_cost is not None and self.params.joining_cost > 0) else proposed_joining_cost)
             print_cost = (self.params.print_cost if (self.params.print_cost is not None and self.params.print_cost > 0) else proposed_print_cost) if self.params.is_printed else 0.0
             slotting_cost = (self.params.slotting_cost if (self.params.slotting_cost is not None and self.params.slotting_cost > 0) else proposed_slotting_cost) if carton_type == 'RSC' else 0.0
             bundling_cost = self.params.bundling_cost
@@ -530,6 +538,14 @@ class CostingCalculator:
         elif self.params.ply_type == "3-Ply":
             # 3-Ply: Liner 1 + (Flute 1 × Factor) + Liner 2
             return gsm[0] + (gsm[1] * wave_factor_1) + gsm[2]
+        
+        elif self.params.ply_type == "4-Ply":
+            # 4-Ply: Liner 1 + (Flute 1 × Factor 1) + Liner 2 + (Flute 2 × Factor 2)
+            g0 = gsm[0] if len(gsm) > 0 else 0
+            g1 = gsm[1] if len(gsm) > 1 else 0
+            g2 = gsm[2] if len(gsm) > 2 else 0
+            g3 = gsm[3] if len(gsm) > 3 else 0
+            return g0 + (g1 * wave_factor_1) + g2 + (g3 * wave_factor_2)
         
         elif self.params.ply_type == "5-Ply":
             # 5-Ply: Liner 1 + (Flute 1 × Factor 1) + Liner 2 (Middle) + (Flute 2 × Factor 2) + Liner 3 (Outer)

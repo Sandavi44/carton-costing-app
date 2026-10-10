@@ -69,11 +69,11 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const rateM = parseFloat(calculatedCost.category?.proposed_costs?.joining_cost_glued_m ?? 4.5);
   const rateL = parseFloat(calculatedCost.category?.proposed_costs?.joining_cost_glued_l ?? 6.0);
 
-  const proposedJoining = calculatedCost.category?.proposed_costs?.joining_cost ?? (
+  const proposedJoining = cartonType === 'S.F.' ? 0.0 : (calculatedCost.category?.proposed_costs?.joining_cost ?? (
     formData.joiningType === 'Stitched'
       ? (H > 0 ? Math.max(0, parseFloat(((((H / 25) - 1) * 2) * (isTwoUp ? 1.5 : 1)).toFixed(2))) : 0)
       : parseFloat(((cartonCategory === 'S' ? rateS : cartonCategory === 'M' ? rateM : rateL) * (isTwoUp ? 1.5 : 1)).toFixed(2))
-  );
+  ));
   const proposedPrint = calculatedCost.category?.proposed_costs?.print_cost ?? (
     formData.isPrinted ? (cartonCategory === 'S' ? 3.0 : cartonCategory === 'M' ? 4.0 : 6.0) : 0
   );
@@ -464,8 +464,10 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
               <div className={solveBoxClass}>
                 <div className="space-y-2 text-xs">
                   <div>
-                    <span className="font-bold">Joining Cost ({formData.joiningType}): </span>
-                    {formData.joiningType === 'Stitched' ? (
+                    <span className="font-bold">Joining Cost ({cartonType === 'S.F.' ? 'S.F.' : formData.joiningType}): </span>
+                    {cartonType === 'S.F.' ? (
+                      <span>Inactive for S.F. = <strong>Rs. 0.00</strong></span>
+                    ) : formData.joiningType === 'Stitched' ? (
                       <span>Equation: [({H} / 25) - 1] * 2{isTwoUp ? ' * 1.5 [2-Up]' : ''} = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>
                     ) : (
                       <span>Category Type {cartonCategory} (Glued: S={rateS.toFixed(2)}, M={rateM.toFixed(2)}, L={rateL.toFixed(2)}{isTwoUp ? ' * 1.5 [2-Up]' : ''}) = <strong>Rs. {proposedJoining.toFixed(2)}</strong></span>

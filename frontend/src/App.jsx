@@ -62,6 +62,7 @@ function App() {
     thirdPartyCommission: '',
     hasTransport: false,
     transportCost: '',
+    transportOption: 'Ex factory price from Biyagama factory ( No transport)',
     oneTimeDieCost: '',
     oneTimeBlockCost: '',
     oneTimeTransportCost: '',

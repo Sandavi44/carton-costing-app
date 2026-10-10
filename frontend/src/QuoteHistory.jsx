@@ -142,6 +142,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
     switch(plyType) {
       case '2-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }];
       case '3-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }];
+      case '4-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }, { name: 'gsm4' }];
       case '5-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }, { name: 'gsm4' }, { name: 'gsm5' }];
       case '7-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }, { name: 'gsm4' }, { name: 'gsm5' }, { name: 'gsm6' }, { name: 'gsm7' }];
       default: return [];
@@ -194,6 +195,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         thirdPartyCommission: quote.third_party_commission !== undefined ? quote.third_party_commission.toString() : '',
         hasTransport: quote.has_transport || false,
         transportCost: quote.transport_cost !== undefined ? quote.transport_cost.toString() : '',
+        transportOption: quote.transport_option || (quote.has_transport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
         oneTimeDieCost: (quote.die_making_cost && quote.die_making_cost > 0) ? String(quote.die_making_cost) : '',
         oneTimeBlockCost: (quote.block_making_cost && quote.block_making_cost > 0) ? String(quote.block_making_cost) : '',
         oneTimeTransportCost: (quote.one_time_transport_cost && quote.one_time_transport_cost > 0) ? String(quote.one_time_transport_cost) : '',
@@ -228,7 +230,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         white_liner_rate: parseFloat(newFormData.whiteLinerRate || 0),
         brown_liner_rate: parseFloat(newFormData.brownLinerRate || 0),
         total_overhead_for_order: parseFloat(newFormData.totalOverheadForOrder || 0),
-        joining_cost: parseFloat(newFormData.joiningCost || 0),
+        joining_cost: (newFormData.productionMethod === 'Outsource' || newFormData.cartonType === 'S.F.') ? 0 : parseFloat(newFormData.joiningCost || 0),
         print_cost: newFormData.isPrinted ? parseFloat(newFormData.printCost || 0) : 0,
         slotting_cost: parseFloat(newFormData.slottingCost || 0),
         bundling_cost: parseFloat(newFormData.bundlingCost || 0),
@@ -636,28 +638,50 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         })();
 
         const dimUnit = selectedQuote.dimension_unit || 'mm';
-        const hasInputs = selectedQuote.carton_length_input && selectedQuote.carton_width_input && selectedQuote.carton_height_input;
+        const isSF = selectedQuote.carton_type === 'S.F.';
+        const isPrinted = Boolean(selectedQuote.is_printed);
 
         let dimStr;
-        if (dimUnit === 'inches') {
-          if (hasInputs) {
-            dimStr = `${selectedQuote.carton_length_input}×${selectedQuote.carton_width_input}×${selectedQuote.carton_height_input} inches`;
+        if (isSF) {
+          if (dimUnit === 'inches') {
+            const lIn = selectedQuote.die_length_input ? selectedQuote.die_length_input : (selectedQuote.die_length_mm ? (selectedQuote.die_length_mm / 25.4).toFixed(2).replace(/\.00$/, '') : '0');
+            const wIn = selectedQuote.die_width_input ? selectedQuote.die_width_input : (selectedQuote.die_width_mm ? (selectedQuote.die_width_mm / 25.4).toFixed(2).replace(/\.00$/, '') : '0');
+            dimStr = `${lIn}×${wIn} inches`;
           } else {
-            const lIn = (selectedQuote.carton_length_mm / 25.4).toFixed(2).replace(/\.00$/, '');
-            const wIn = (selectedQuote.carton_width_mm / 25.4).toFixed(2).replace(/\.00$/, '');
-            const hIn = (selectedQuote.carton_height_mm / 25.4).toFixed(2).replace(/\.00$/, '');
-            dimStr = `${lIn}×${wIn}×${hIn} inches`;
+            const lMm = Math.round(selectedQuote.die_length_mm || 0);
+            const wMm = Math.round(selectedQuote.die_width_mm || 0);
+            dimStr = `${lMm}×${wMm} mm`;
           }
         } else {
-          const lMm = Math.round(selectedQuote.carton_length_mm || selectedQuote.dimensions?.length_mm || 0);
-          const wMm = Math.round(selectedQuote.carton_width_mm || selectedQuote.dimensions?.width_mm || 0);
-          const hMm = Math.round(selectedQuote.carton_height_mm || selectedQuote.dimensions?.height_mm || 0);
-          dimStr = `${lMm}×${wMm}×${hMm} mm`;
+          const hasInputs = selectedQuote.carton_length_input && selectedQuote.carton_width_input && selectedQuote.carton_height_input;
+          if (dimUnit === 'inches') {
+            if (hasInputs) {
+              dimStr = `${selectedQuote.carton_length_input}×${selectedQuote.carton_width_input}×${selectedQuote.carton_height_input} inches`;
+            } else {
+              const lIn = (selectedQuote.carton_length_mm / 25.4).toFixed(2).replace(/\.00$/, '');
+              const wIn = (selectedQuote.carton_width_mm / 25.4).toFixed(2).replace(/\.00$/, '');
+              const hIn = (selectedQuote.carton_height_mm / 25.4).toFixed(2).replace(/\.00$/, '');
+              dimStr = `${lIn}×${wIn}×${hIn} inches`;
+            }
+          } else {
+            const lMm = Math.round(selectedQuote.carton_length_mm || selectedQuote.dimensions?.length_mm || 0);
+            const wMm = Math.round(selectedQuote.carton_width_mm || selectedQuote.dimensions?.width_mm || 0);
+            const hMm = Math.round(selectedQuote.carton_height_mm || selectedQuote.dimensions?.height_mm || 0);
+            dimStr = `${lMm}×${wMm}×${hMm} mm`;
+          }
         }
 
-        const plyStr = selectedQuote.ply_type ? `${selectedQuote.ply_type.replace('-', ' ')} Carton` : 'Carton';
-        const typeStr = selectedQuote.carton_type ? `${selectedQuote.carton_type} Type` : 'RSC Type';
-        const descStr = `${dimStr} - ${plyStr} - ${typeStr}`;
+        const plyClean = (selectedQuote.ply_type || '3-Ply').replace('-', ' ');
+        let descStr;
+        if (isSF) {
+          const isSheet = selectedQuote.ply_type === '2-Ply' || selectedQuote.ply_type === '4-Ply';
+          const productNoun = isSheet ? (isPrinted ? 'Printed Sheet' : 'Sheet') : (isPrinted ? 'Printed Boards' : 'Boards');
+          descStr = `${dimStr} - ${plyClean} ${productNoun} - S.F.`;
+        } else {
+          const productNoun = isPrinted ? 'Printed Carton' : 'Carton';
+          const typeStr = selectedQuote.carton_type ? `${selectedQuote.carton_type} Type` : 'RSC Type';
+          descStr = `${dimStr} - ${plyClean} ${productNoun} - ${typeStr}`;
+        }
         const displayQuoteNo = selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`;
 
         // Flute and Board Formatting (no flute factor)
@@ -1016,8 +1040,15 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                     </div>
 
                     {/* Total Summary Breakdown */}
-                    <div className="mt-5 flex justify-end">
-                      <div className="w-full sm:w-72 space-y-1.5 text-xs sm:text-sm">
+                    <div className="mt-5 flex flex-col sm:flex-row justify-between items-start gap-4">
+                      <div className="text-xs sm:text-sm font-semibold text-gray-800 pt-1">
+                        <span className="font-bold text-gray-900">Transport - </span>
+                        <span>
+                          {selectedQuote.transport_option || 
+                            (selectedQuote.has_transport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)')}
+                        </span>
+                      </div>
+                      <div className="w-full sm:w-72 space-y-1.5 text-xs sm:text-sm ml-auto">
                         {isVatCustomer ? (
                           <>
                             <div className="flex justify-between py-1 text-gray-700 border-b border-gray-100">
