@@ -684,10 +684,9 @@ def save_quote():
 @app.route('/api/quotes/history', methods=['GET'])
 @jwt_required()
 def get_quote_history():
-    """Get quote history"""
+    """Get all company quote history (accessible to all authenticated users)"""
     try:
-        user_id = int(get_jwt_identity())
-        quotes = Quote.query.filter_by(user_id=user_id).order_by(Quote.created_at.desc()).all()
+        quotes = Quote.query.order_by(Quote.created_at.desc()).all()
         
         result = []
         for quote in quotes:
@@ -772,10 +771,9 @@ def get_quote_history():
 @app.route('/api/quotes/<int:quote_id>', methods=['GET'])
 @jwt_required()
 def get_quote(quote_id):
-    """Get specific quote"""
+    """Get specific quote (accessible to all authenticated users)"""
     try:
-        user_id = int(get_jwt_identity())
-        quote = Quote.query.filter_by(id=quote_id, user_id=user_id).first()
+        quote = Quote.query.filter_by(id=quote_id).first()
         
         if not quote:
             return jsonify({'error': 'Quote not found'}), 404
