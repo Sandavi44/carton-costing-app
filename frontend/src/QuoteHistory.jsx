@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import OfficialQuotationModal from './OfficialQuotationModal';
 
 export default function QuoteHistory({ setFormData, setCalculatedCost, setActiveTab, theme }) {
   const [quotes, setQuotes] = useState([]);
@@ -9,9 +10,10 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
   // Modals / Action States
   const [actionPromptQuote, setActionPromptQuote] = useState(null);
   const [selectedQuote, setSelectedQuote] = useState(null);
-  const [reportTaxFormat, setReportTaxFormat] = useState('auto');
   const [actionLoading, setActionLoading] = useState(false);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // Multi-quote selection state for batch compilation
+  const [selectedQuoteIds, setSelectedQuoteIds] = useState([]);
 
   // Filter States
   const [customerFilter, setCustomerFilter] = useState('');
@@ -83,44 +85,59 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
     }
   };
 
-  const handleSavePdf = async (quote, displayNo) => {
-    const element = document.getElementById('printable-quotation-sheet');
-    if (!element) return;
-    const safeCustomer = (quote.customer_name || 'Customer').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const fileName = `Quotation_${displayNo}_${safeCustomer}.pdf`;
+  const handleCompileSelected = () => {
+    if (selectedQuoteIds.length === 0) return;
+    const selectedList = quotes.filter(q => selectedQuoteIds.includes(q.id));
+    if (selectedList.length === 0) return;
 
-    if (window.html2pdf) {
-      setDownloadingPdf(true);
-      try {
-        const opt = {
-          margin: [8, 8, 8, 8],
-          filename: fileName,
-          image: { type: 'jpeg', quality: 0.98 },
-          enableLinks: false,
-          html2canvas: { scale: 2, useCORS: true, logging: false },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        await Promise.race([
-          window.html2pdf().set(opt).from(element).save(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('PDF generation timed out')), 8000))
-        ]);
-      } catch (err) {
-        console.error('html2pdf download error, falling back to print:', err);
-        const prevTitle = document.title;
-        document.title = fileName.replace('.pdf', '');
-        window.print();
-        setTimeout(() => { document.title = prevTitle; }, 1000);
-      } finally {
-        setDownloadingPdf(false);
-        cleanOverlays();
-        setTimeout(cleanOverlays, 300);
-      }
-    } else {
-      const prevTitle = document.title;
-      document.title = fileName.replace('.pdf', '');
-      window.print();
-      setTimeout(() => { document.title = prevTitle; }, 1000);
+    // 1. Strict validation: Customer name check (STOP with error if different customers)
+    const customerNames = Array.from(new Set(selectedList.map(q => (q.customer_name || '').trim()).filter(Boolean)));
+    if (customerNames.length > 1) {
+      const errMsg = `Cannot compile quotations from different customers (${customerNames.join(', ')}). All selected quotations must belong to the same customer.`;
+      setError(errMsg);
+      alert(`❌ ${errMsg}`);
+      return;
     }
+
+    // 2. Strict validation: Tax format check (STOP with error if VAT and Non-VAT are mixed)
+    const hasVat = selectedList.some(q => !q.tax_type || !q.tax_type.includes('Non-VAT'));
+    const hasNonVat = selectedList.some(q => q.tax_type && q.tax_type.includes('Non-VAT'));
+    if (hasVat && hasNonVat) {
+      const errMsg = 'Cannot compile VAT and Non-VAT quotations together. All selected quotations must have the same tax format (either all VAT or all Non-VAT).';
+      setError(errMsg);
+      alert(`❌ ${errMsg}`);
+      return;
+    }
+
+    // Clear any previous error
+    setError('');
+
+    const compiledItems = [];
+    selectedList.forEach(q => {
+      if (q.items && Array.isArray(q.items) && q.items.length > 0) {
+        compiledItems.push(...q.items);
+      } else {
+        compiledItems.push(q);
+      }
+    });
+
+    const primaryQuote = selectedList[0];
+    const totalBatchSum = compiledItems.reduce((acc, it) => {
+      const q = parseInt(it.quantity || 0, 10);
+      const p = Math.round(parseFloat(it.final_cost_per_carton || it.finalCostPerCarton || 0) * 4) / 4;
+      return acc + (p * q);
+    }, 0);
+
+    const compiledQuote = {
+      ...primaryQuote,
+      id: `compiled-${Date.now()}`,
+      quote_no: selectedList.map(q => q.quote_no || `QT-${String(q.id).padStart(5, '0')}`).join(' / '),
+      customer_name: primaryQuote.customer_name,
+      items: compiledItems,
+      total_cost_batch: totalBatchSum
+    };
+
+    setSelectedQuote(compiledQuote);
   };
 
   const handleRowClick = async (quoteId) => {
@@ -430,111 +447,222 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
           No quotes match your filters.
         </div>
       ) : (
-        <div className={`overflow-x-auto rounded-2xl border ${
-          isDark ? 'border-[#c5a880]/20' : isSand ? 'border-[#dfd5bc]' : 'border-[#bbf7d0]'
-        }`}>
-          <table className={`min-w-full divide-y ${
-            isDark ? 'divide-[#c5a880]/20' : isSand ? 'divide-[#dfd5bc]' : 'divide-[#bbf7d0]'
+        <>
+          {/* Compilation Action Banner when quotes are selected */}
+          {(() => {
+            if (selectedQuoteIds.length === 0) return null;
+            const selList = quotes.filter(q => selectedQuoteIds.includes(q.id));
+            const custs = Array.from(new Set(selList.map(q => (q.customer_name || '').trim()).filter(Boolean)));
+            const hasMultipleCustomers = custs.length > 1;
+            const hasVat = selList.some(q => !q.tax_type || !q.tax_type.includes('Non-VAT'));
+            const hasNonVat = selList.some(q => q.tax_type && q.tax_type.includes('Non-VAT'));
+            const hasMixedTax = hasVat && hasNonVat;
+            const isInvalid = hasMultipleCustomers || hasMixedTax;
+
+            return (
+              <div className={`p-4 mb-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border shadow-md animate-fade-in ${
+                isInvalid
+                  ? isDark ? 'bg-red-950/40 border-red-800/60 text-red-200' : 'bg-red-50 border-red-300 text-red-900'
+                  : isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-900'
+              }`}>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <span>{isInvalid ? '⚠️' : '☑️'}</span>
+                    <span>{selectedQuoteIds.length} quote(s) selected for compilation</span>
+                    {!isInvalid && custs.length === 1 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        {custs[0]} ({hasNonVat ? 'Non-VAT' : 'VAT'})
+                      </span>
+                    )}
+                  </div>
+                  {hasMultipleCustomers && (
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">
+                      ❌ Selected quotes belong to different customers ({custs.join(', ')}). All must belong to the same customer.
+                    </p>
+                  )}
+                  {hasMixedTax && (
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">
+                      ❌ Selected quotes mix VAT and Non-VAT. All must have the same tax format.
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCompileSelected}
+                    className={`px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md cursor-pointer transition ${
+                      isInvalid 
+                        ? 'bg-gray-400 text-gray-200 dark:bg-slate-700 dark:text-slate-400 hover:opacity-90' 
+                        : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white hover:scale-[1.02]'
+                    }`}
+                  >
+                    📑 Compile Selected ({selectedQuoteIds.length}) into One Quotation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQuoteIds([])}
+                    className="px-3 py-2 rounded-xl font-bold text-xs bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 cursor-pointer transition"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className={`overflow-x-auto rounded-2xl border ${
+            isDark ? 'border-[#c5a880]/20' : isSand ? 'border-[#dfd5bc]' : 'border-[#bbf7d0]'
           }`}>
-            <thead className={isDark ? 'bg-[#131924]/80' : isSand ? 'bg-[#eae5d9]/30' : 'bg-[#eaf5ea]'}>
-              <tr>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-                  Order No.
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-                  Customer
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-                  Dimensions (L×W×H mm)
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-                  Ply / Qty
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-                  Per Carton / Total
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-                  Date
-                </th>
-                <th className={`px-6 py-3 text-right text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className={`divide-y text-sm ${
-              isDark ? 'bg-[#131924]/40 divide-[#c5a880]/15' : isSand ? 'bg-white divide-[#dfd5bc]' : 'bg-white divide-[#bbf7d0]'
+            <table className={`min-w-full divide-y ${
+              isDark ? 'divide-[#c5a880]/20' : isSand ? 'divide-[#dfd5bc]' : 'divide-[#bbf7d0]'
             }`}>
-              {filteredQuotes.map((quote) => (
-                <tr
-                  key={quote.id}
-                  onClick={() => handleRowClick(quote.id)}
-                  className={`transition cursor-pointer ${
-                    isDark ? 'hover:bg-[#1a2332]/60' : isSand ? 'hover:bg-[#faf8f5]' : 'hover:bg-[#eaf5ea]/50'
-                  }`}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap font-bold">
-                    <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${
-                      isDark 
-                        ? 'bg-[#d4af37]/25 text-[#d4af37]' 
-                        : isSand
-                          ? 'bg-[#9f8150]/15 text-[#8c734b]'
-                          : 'bg-emerald-100 text-emerald-800'
-                    }`}>
-                      {quote.quote_no || `QT-${String(quote.id).padStart(5, '0')}`}
-                    </span>
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap font-medium ${
-                    isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-[#14532d]'
-                  }`}>
-                    {quote.customer_name}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap font-mono text-sm ${
-                    isDark ? 'text-slate-300' : isSand ? 'text-[#6b5940]' : 'text-gray-700'
-                  }`}>
-                    {quote.dimensions}
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap ${
-                    isDark ? 'text-slate-300' : isSand ? 'text-[#6b5940]' : 'text-gray-700'
-                  }`}>
-                    {quote.ply_type} / <span className={`font-semibold ${
-                      isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-[#14532d]'
-                    }`}>{quote.quantity}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-semibold">
-                    Rs. {quote.final_cost_per_carton}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''} / <span className={
-                      isDark ? "text-[#d4af37]" : isSand ? "text-[#8c734b]" : "text-[#15803d]"
-                    }>Rs. {quote.total_cost_batch}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
-                  </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-xs ${
-                    isDark ? 'text-slate-400' : isSand ? 'text-[#8c734b]/80' : 'text-[#166534]/80'
-                  }`}>
-                    {new Date(quote.created_at).toLocaleDateString()}{' '}
-                    {new Date(quote.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-xs font-medium space-x-2" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleRowClick(quote.id)}
-                      className={`font-semibold px-3 py-1.5 rounded-lg border transition cursor-pointer ${
-                        isDark 
-                          ? 'text-[#d4af37] bg-[#d4af37]/10 hover:bg-[#d4af37]/20 border-[#c5a880]/30' 
-                          : 'text-[#8c734b] bg-[#faf8f5] border-[#dfd5bc] hover:bg-[#eae5d9]/40'
-                      }`}
-                    >
-                      Open Options
-                    </button>
-                    <button
-                      onClick={() => handleDeleteQuote(quote.id, quote.quote_no)}
-                      className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
-                      title="Delete Quote"
-                    >
-                      🗑️
-                    </button>
-                  </td>
+              <thead className={isDark ? 'bg-[#131924]/80' : isSand ? 'bg-[#eae5d9]/30' : 'bg-[#eaf5ea]'}>
+                <tr>
+                  <th className="px-4 py-3 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredQuotes.length > 0 && selectedQuoteIds.length === filteredQuotes.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedQuoteIds(filteredQuotes.map(q => q.id));
+                        } else {
+                          setSelectedQuoteIds([]);
+                        }
+                      }}
+                      className="w-4 h-4 cursor-pointer rounded"
+                      title="Select / Deselect All"
+                    />
+                  </th>
+                  <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Order No.
+                  </th>
+                  <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Customer
+                  </th>
+                  <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Dimensions / Items
+                  </th>
+                  <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Ply / Qty
+                  </th>
+                  <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Per Carton / Total
+                  </th>
+                  <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Date
+                  </th>
+                  <th className={`px-5 py-3 text-right text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className={`divide-y text-sm ${
+                isDark ? 'bg-[#131924]/40 divide-[#c5a880]/15' : isSand ? 'bg-white divide-[#dfd5bc]' : 'bg-white divide-[#bbf7d0]'
+              }`}>
+                {filteredQuotes.map((quote) => (
+                  <tr
+                    key={quote.id}
+                    onClick={() => handleRowClick(quote.id)}
+                    className={`transition cursor-pointer ${
+                      selectedQuoteIds.includes(quote.id)
+                        ? isDark ? 'bg-[#d4af37]/15' : 'bg-amber-50'
+                        : isDark ? 'hover:bg-[#1a2332]/60' : isSand ? 'hover:bg-[#faf8f5]' : 'hover:bg-[#eaf5ea]/50'
+                    }`}
+                  >
+                    <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedQuoteIds.includes(quote.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (e.target.checked) {
+                            setSelectedQuoteIds(prev => [...prev, quote.id]);
+                          } else {
+                            setSelectedQuoteIds(prev => prev.filter(id => id !== quote.id));
+                          }
+                        }}
+                        className="w-4 h-4 cursor-pointer rounded"
+                      />
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap font-bold">
+                      <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${
+                        isDark 
+                          ? 'bg-[#d4af37]/25 text-[#d4af37]' 
+                          : isSand
+                            ? 'bg-[#9f8150]/15 text-[#8c734b]'
+                            : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {quote.quote_no || `QT-${String(quote.id).padStart(5, '0')}`}
+                      </span>
+                    </td>
+                    <td className={`px-5 py-4 whitespace-nowrap font-medium ${
+                      isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-[#14532d]'
+                    }`}>
+                      {quote.customer_name}
+                    </td>
+                    <td className={`px-5 py-4 whitespace-nowrap font-mono text-sm ${
+                      isDark ? 'text-slate-300' : isSand ? 'text-[#6b5940]' : 'text-gray-700'
+                    }`}>
+                      {quote.item_count > 1 ? (
+                        <div>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">📋 {quote.item_count} Items</span>
+                          <div className="text-[11px] opacity-75 font-sans">Compiled Quote</div>
+                        </div>
+                      ) : (
+                        quote.dimensions
+                      )}
+                    </td>
+                    <td className={`px-5 py-4 whitespace-nowrap ${
+                      isDark ? 'text-slate-300' : isSand ? 'text-[#6b5940]' : 'text-gray-700'
+                    }`}>
+                      {quote.item_count > 1 ? 'Multi-ply' : quote.ply_type} / <span className={`font-semibold ${
+                        isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-[#14532d]'
+                      }`}>{quote.quantity}</span>
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap font-semibold">
+                      {quote.item_count > 1 ? (
+                        <span className={isDark ? "text-[#d4af37]" : isSand ? "text-[#8c734b]" : "text-[#15803d]"}>
+                          Total: Rs. {quote.total_cost_batch}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}
+                        </span>
+                      ) : (
+                        <>
+                          Rs. {quote.final_cost_per_carton}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''} / <span className={
+                            isDark ? "text-[#d4af37]" : isSand ? "text-[#8c734b]" : "text-[#15803d]"
+                          }>Rs. {quote.total_cost_batch}{quote.tax_type && !quote.tax_type.includes('Non-VAT') ? ' + VAT' : ''}</span>
+                        </>
+                      )}
+                    </td>
+                    <td className={`px-5 py-4 whitespace-nowrap text-xs ${
+                      isDark ? 'text-slate-400' : isSand ? 'text-[#8c734b]/80' : 'text-[#166534]/80'
+                    }`}>
+                      {new Date(quote.created_at).toLocaleDateString()}{' '}
+                      {new Date(quote.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap text-right text-xs font-medium space-x-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleRowClick(quote.id)}
+                        className={`font-semibold px-3 py-1.5 rounded-lg border transition cursor-pointer ${
+                          isDark 
+                            ? 'text-[#d4af37] bg-[#d4af37]/10 hover:bg-[#d4af37]/20 border-[#c5a880]/30' 
+                            : 'text-[#8c734b] bg-[#faf8f5] border-[#dfd5bc] hover:bg-[#eae5d9]/40'
+                        }`}
+                      >
+                        Open Options
+                      </button>
+                      <button
+                        onClick={() => handleDeleteQuote(quote.id, quote.quote_no)}
+                        className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
+                        title="Delete Quote"
+                      >
+                        🗑️
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       </div>
 
@@ -605,634 +733,15 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
       )}
 
       {/* DETAIL MODAL - OFFICIAL QUOTATION REPORT */}
-      {selectedQuote && (() => {
-        const isVatCustomer = reportTaxFormat === 'vat' || 
-          (reportTaxFormat === 'auto' && (!selectedQuote.tax_type || !selectedQuote.tax_type.includes('Non-VAT')));
+      {selectedQuote && (
+        <OfficialQuotationModal
+          quote={selectedQuote}
+          onClose={() => setSelectedQuote(null)}
+          onDelete={selectedQuote.id && !String(selectedQuote.id).startsWith('compiled-') ? () => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no) : null}
+          theme={theme}
+        />
+      )}
 
-        // Unit price rounded off to nearest 25 cents (0.25)
-        const rawUnitPrice = parseFloat(selectedQuote.final_cost_per_carton || 0);
-        const unitPrice = Math.round(rawUnitPrice * 4) / 4;
-        const qty = parseInt(selectedQuote.quantity || 0, 10);
-        const cartonAmount = unitPrice * qty;
-
-        // Special One-Time Costs
-        const dieCost = parseFloat(selectedQuote.die_making_cost || 0);
-        const blockCost = parseFloat(selectedQuote.block_making_cost || 0);
-        const oneTimeTransport = parseFloat(selectedQuote.one_time_transport_cost || 0);
-
-        // Subtotal is sum of carton order amount + any optional one-time charges
-        const subtotalAmount = cartonAmount + dieCost + blockCost + oneTimeTransport;
-        const vatAmount = subtotalAmount * 0.18;
-        const totalAmount = isVatCustomer ? (subtotalAmount + vatAmount) : subtotalAmount;
-
-        const displayDate = (() => {
-          if (!selectedQuote?.created_at) return new Date().toLocaleDateString('en-GB');
-          if (typeof selectedQuote.created_at === 'string' && selectedQuote.created_at.includes('/')) {
-            return selectedQuote.created_at;
-          }
-          try {
-            return new Date(selectedQuote.created_at).toLocaleDateString('en-GB');
-          } catch (e) {
-            return String(selectedQuote.created_at);
-          }
-        })();
-
-        const dimUnit = selectedQuote.dimension_unit || 'mm';
-        const isSF = selectedQuote.carton_type === 'S.F.';
-        const isPrinted = Boolean(selectedQuote.is_printed);
-
-        let dimStr;
-        if (isSF) {
-          if (dimUnit === 'inches') {
-            const lIn = selectedQuote.die_length_input ? selectedQuote.die_length_input : (selectedQuote.die_length_mm ? (selectedQuote.die_length_mm / 25.4).toFixed(2).replace(/\.00$/, '') : '0');
-            const wIn = selectedQuote.die_width_input ? selectedQuote.die_width_input : (selectedQuote.die_width_mm ? (selectedQuote.die_width_mm / 25.4).toFixed(2).replace(/\.00$/, '') : '0');
-            dimStr = `${lIn}×${wIn} inches`;
-          } else {
-            const lMm = Math.round(selectedQuote.die_length_mm || 0);
-            const wMm = Math.round(selectedQuote.die_width_mm || 0);
-            dimStr = `${lMm}×${wMm} mm`;
-          }
-        } else {
-          const hasInputs = selectedQuote.carton_length_input && selectedQuote.carton_width_input && selectedQuote.carton_height_input;
-          if (dimUnit === 'inches') {
-            if (hasInputs) {
-              dimStr = `${selectedQuote.carton_length_input}×${selectedQuote.carton_width_input}×${selectedQuote.carton_height_input} inches`;
-            } else {
-              const lIn = (selectedQuote.carton_length_mm / 25.4).toFixed(2).replace(/\.00$/, '');
-              const wIn = (selectedQuote.carton_width_mm / 25.4).toFixed(2).replace(/\.00$/, '');
-              const hIn = (selectedQuote.carton_height_mm / 25.4).toFixed(2).replace(/\.00$/, '');
-              dimStr = `${lIn}×${wIn}×${hIn} inches`;
-            }
-          } else {
-            const lMm = Math.round(selectedQuote.carton_length_mm || selectedQuote.dimensions?.length_mm || 0);
-            const wMm = Math.round(selectedQuote.carton_width_mm || selectedQuote.dimensions?.width_mm || 0);
-            const hMm = Math.round(selectedQuote.carton_height_mm || selectedQuote.dimensions?.height_mm || 0);
-            dimStr = `${lMm}×${wMm}×${hMm} mm`;
-          }
-        }
-
-        const plyClean = (selectedQuote.ply_type || '3-Ply').replace('-', ' ');
-        let descStr;
-        if (isSF) {
-          const isSheet = selectedQuote.ply_type === '2-Ply' || selectedQuote.ply_type === '4-Ply';
-          const productNoun = isSheet ? (isPrinted ? 'Printed Sheet' : 'Sheet') : (isPrinted ? 'Printed Boards' : 'Boards');
-          descStr = `${dimStr} - ${plyClean} ${productNoun} - S.F.`;
-        } else {
-          const productNoun = isPrinted ? 'Printed Carton' : 'Carton';
-          const typeStr = selectedQuote.carton_type ? `${selectedQuote.carton_type} Type` : 'RSC Type';
-          descStr = `${dimStr} - ${plyClean} ${productNoun} - ${typeStr}`;
-        }
-        const displayQuoteNo = selectedQuote.quote_no || `QT-${String(selectedQuote.id).padStart(5, '0')}`;
-
-        // Flute and Board Formatting (no flute factor)
-        const formatFluteName = (f) => {
-          if (!f) return '';
-          return f.replace(/-Flute/i, ' flute').replace(/Flute/i, 'flute');
-        };
-        const fluteDisplay = (() => {
-          const f1 = formatFluteName(selectedQuote.flute_type);
-          const f2 = selectedQuote.ply_type === '5-Ply' && selectedQuote.flute_type_2 && selectedQuote.flute_type_2 !== selectedQuote.flute_type
-            ? formatFluteName(selectedQuote.flute_type_2)
-            : null;
-          return f2 ? `${f1} / ${f2}` : (f1 || 'B flute');
-        })();
-        // Board Formatting
-        const formatBoardName = (b) => {
-          if (!b) return 'Brown Liner';
-          if (b.toLowerCase().includes('white')) return 'White Liner';
-          if (b.toLowerCase().includes('brown')) return 'Brown Liner';
-          return b;
-        };
-        const boardDisplay = formatBoardName(selectedQuote.board_type);
-        const paymentMethodDisplay = selectedQuote.payment_method || 'Credit - 30 Days';
-
-        return (
-          <div 
-            className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-[99999] overflow-y-auto"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                cleanOverlays();
-                setSelectedQuote(null);
-              }
-            }}
-          >
-            {/* Inline Print Styles: Forces clean 1-Page Quotation */}
-            <style>{`
-              @media print {
-                @page {
-                  size: A4 portrait;
-                  margin: 0 !important;
-                }
-                html, body {
-                  height: auto !important;
-                  overflow: visible !important;
-                  background: white !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                }
-                /* Hide everything in the background so it takes 0 height */
-                .quote-history-main-content,
-                .no-print-zone,
-                nav,
-                header,
-                footer {
-                  display: none !important;
-                }
-                /* Remove any printed link URLs */
-                a[href]:after {
-                  content: none !important;
-                }
-                /* Reset modal wrapper so it doesn't create extra pages */
-                .fixed.inset-0 {
-                  position: static !important;
-                  inset: auto !important;
-                  background: transparent !important;
-                  padding: 0 !important;
-                  margin: 0 !important;
-                  width: 100% !important;
-                  height: auto !important;
-                  max-height: none !important;
-                  overflow: visible !important;
-                  display: block !important;
-                }
-                .max-w-3xl {
-                  max-width: 100% !important;
-                  width: 100% !important;
-                  border: none !important;
-                  box-shadow: none !important;
-                  padding: 0 !important;
-                  margin: 0 !important;
-                  background: transparent !important;
-                  max-height: none !important;
-                  overflow: visible !important;
-                }
-                .overflow-y-auto {
-                  overflow: visible !important;
-                  max-height: none !important;
-                  height: auto !important;
-                  padding: 0 !important;
-                }
-                /* The Printable Quotation Sheet: Single Page, Natural Flow with 0 browser margins */
-                #printable-quotation-sheet {
-                  position: static !important;
-                  width: 100% !important;
-                  box-sizing: border-box !important;
-                  margin: 0 auto !important;
-                  padding: 10mm 14mm !important;
-                  background: white !important;
-                  color: #111827 !important;
-                  border: none !important;
-                  box-shadow: none !important;
-                  min-height: auto !important;
-                  page-break-inside: avoid !important;
-                  break-inside: avoid !important;
-                  page-break-after: avoid !important;
-                  break-after: avoid !important;
-                }
-              }
-            `}</style>
-
-            <div className={`rounded-3xl shadow-2xl max-w-3xl w-full p-4 sm:p-6 relative border flex flex-col max-h-[94vh] ${
-              isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30 shadow-black/60' : 'bg-[#fcfaf7] text-[#2d2417] border-[#dfd5bc]'
-            }`}>
-              {/* Modal Header Bar with Format Switcher & Close button */}
-              <div className="no-print-zone flex flex-wrap items-center justify-between gap-2 border-b pb-3 mb-3 shrink-0 border-gray-200 dark:border-slate-800">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">📄</span>
-                  <div>
-                    <h3 className={`text-base sm:text-lg font-black leading-tight ${isDark ? 'text-[#f5deb3]' : 'text-[#1a130b]'}`}>
-                      Official Quotation Preview
-                    </h3>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{displayQuoteNo}</span>
-                  </div>
-                </div>
-
-                {/* Tax format toggle pills */}
-                <div className="flex items-center bg-gray-100 dark:bg-slate-800/80 p-1 rounded-xl text-xs font-semibold">
-                  <span className="px-2 text-gray-500 dark:text-gray-400 hidden sm:inline">Format:</span>
-                  <button
-                    type="button"
-                    onClick={() => setReportTaxFormat('auto')}
-                    style={reportTaxFormat === 'auto' ? { backgroundColor: '#d97706', color: '#ffffff' } : {}}
-                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                      reportTaxFormat === 'auto'
-                        ? 'shadow-xs'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
-                    }`}
-                    title="Auto-detect from saved quote tax setting"
-                  >
-                    Auto ({isVatCustomer ? 'VAT' : 'Non-VAT'})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReportTaxFormat('vat')}
-                    style={reportTaxFormat === 'vat' ? { backgroundColor: '#2563eb', color: '#ffffff' } : {}}
-                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                      reportTaxFormat === 'vat'
-                        ? 'shadow-xs'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
-                    }`}
-                  >
-                    VAT (18%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReportTaxFormat('non-vat')}
-                    style={reportTaxFormat === 'non-vat' ? { backgroundColor: '#059669', color: '#ffffff' } : {}}
-                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                      reportTaxFormat === 'non-vat'
-                        ? 'shadow-xs'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white'
-                    }`}
-                  >
-                    Non-VAT
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    cleanOverlays();
-                    setSelectedQuote(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-700 dark:hover:text-white text-xl font-bold p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer relative z-10"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Scrollable Document Area (The Printed Quotation Sheet) */}
-              <div className="overflow-y-auto flex-1 pr-1">
-                <div 
-                  id="printable-quotation-sheet"
-                  className="bg-white text-gray-900 border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col justify-between min-h-[480px] print:min-h-0 print:border-none print:shadow-none"
-                >
-                  {/* Top Company Header & Quotation Title */}
-                  <div>
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-5 border-gray-200">
-                      {/* Left: 3D Packaging Cube Logo + Company Details */}
-                      <div className="flex items-center gap-3.5">
-                        <svg className="w-14 h-14 shrink-0 drop-shadow-sm" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          {/* Top facet - Forest Green */}
-                          <polygon points="24,5 43,15.5 24,26 5,15.5" fill="#15803d" stroke="#ffffff" strokeWidth="0.75" />
-                          {/* Left facet - Deep Red / Crimson */}
-                          <polygon points="5,15.5 24,26 24,42 5,31.5" fill="#b91c1c" stroke="#ffffff" strokeWidth="0.75" />
-                          {/* Right facet - Royal Blue */}
-                          <polygon points="24,26 43,15.5 43,31.5 24,42" fill="#1d4ed8" stroke="#ffffff" strokeWidth="0.75" />
-                          {/* Subtle tape line */}
-                          <line x1="24" y1="5" x2="24" y2="26" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeDasharray="2 1" />
-                        </svg>
-                        <div>
-                          <h2 className="text-base sm:text-lg font-black tracking-wide text-gray-900 uppercase font-sans leading-tight">
-                            {isVatCustomer ? 'CHELSY PACKAGING SOLUTIONS (PVT) LTD.' : 'CHELSY PACKAGING PVT LTD'}
-                          </h2>
-                          <p className="text-xs text-gray-600 font-medium leading-relaxed mt-0.5">
-                            No 234/1/A, Siyambalape South, Siyambalape, Biyagama.
-                          </p>
-                          <p className="text-xs text-gray-600 font-medium">
-                            +94 0112 487486
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Right: Quotation Title */}
-                      <div className="text-left sm:text-right w-full sm:w-auto">
-                        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-wider">
-                          Quotation
-                        </h1>
-                        <span className={`inline-block px-2.5 py-0.5 mt-1 text-[11px] font-bold rounded-full uppercase tracking-wider ${
-                          isVatCustomer ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
-                        }`}>
-                          {isVatCustomer ? 'VAT Customer' : 'Non-VAT Customer'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Metadata: Date, Quote No, Customer */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-4 text-xs sm:text-sm border-b border-gray-200">
-                      <div>
-                        <div className="flex gap-2">
-                          <span className="font-bold text-gray-700 min-w-18">Customer:</span>
-                          <span className="font-bold text-gray-900">{selectedQuote.customer_name}</span>
-                        </div>
-                      </div>
-                      <div className="sm:text-right space-y-1">
-                        <div className="flex sm:justify-end gap-2">
-                          <span className="font-bold text-gray-700">Date:</span>
-                          <span className="font-semibold text-gray-900">{displayDate}</span>
-                        </div>
-                        <div className="flex sm:justify-end gap-2">
-                          <span className="font-bold text-gray-700">Quotation Number:</span>
-                          <span className="font-bold text-gray-900 font-mono">{displayQuoteNo}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quotation Table */}
-                    <div className="mt-5 overflow-x-auto">
-                      <table className="w-full text-xs sm:text-sm border-collapse border border-gray-300">
-                        <thead>
-                          <tr className="bg-gray-100 text-gray-800 border-b border-gray-300 font-bold">
-                            <th className="py-2.5 px-3 text-center border-r border-gray-300 w-12">S.N</th>
-                            <th className="py-2.5 px-4 text-left border-r border-gray-300">Description</th>
-                            <th className="py-2.5 px-3 text-right border-r border-gray-300 w-24">QTY</th>
-                            <th className="py-2.5 px-3 text-center border-r border-gray-300 w-16">Unit</th>
-                            <th className="py-2.5 px-3 text-right border-r border-gray-300 w-24">Price</th>
-                            <th className="py-2.5 px-4 text-right w-28">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(() => {
-                            let sNo = 1;
-                            return (
-                              <>
-                                <tr className="border-b border-gray-200 hover:bg-gray-50/50">
-                                  <td className="py-3 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{sNo}</td>
-                                  <td className="py-3 px-4 font-semibold text-gray-900 border-r border-gray-300">
-                                    <div>{descStr}</div>
-                                    <div className="text-[11px] text-gray-600 font-normal mt-1 space-y-0.5">
-                                      <div><span className="font-semibold text-gray-700">Flute Type:</span> {fluteDisplay}</div>
-                                      <div><span className="font-semibold text-gray-700">Board Type:</span> {boardDisplay}</div>
-                                    </div>
-                                  </td>
-                                  <td className="py-3 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">
-                                    {qty.toLocaleString()}
-                                  </td>
-                                  <td className="py-3 px-3 text-center text-gray-700 border-r border-gray-300">
-                                    Nos
-                                  </td>
-                                  <td className="py-3 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
-                                    {unitPrice.toFixed(2)}
-                                  </td>
-                                  <td className="py-3 px-4 text-right font-mono font-bold text-gray-900">
-                                    {cartonAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </td>
-                                </tr>
-
-                                {dieCost > 0 && (() => {
-                                  sNo++;
-                                  return (
-                                    <tr className="border-b border-gray-200 hover:bg-gray-50/50">
-                                      <td className="py-2.5 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{sNo}</td>
-                                      <td className="py-2.5 px-4 font-semibold text-gray-900 border-r border-gray-300">
-                                        <div>Die Making Cost</div>
-                                        <div className="text-[11px] text-gray-500 font-normal">As a One time cost</div>
-                                      </td>
-                                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">1</td>
-                                      <td className="py-2.5 px-3 text-center text-gray-700 border-r border-gray-300">Nos</td>
-                                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
-                                        {dieCost.toFixed(2)}
-                                      </td>
-                                      <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900">
-                                        {dieCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </td>
-                                    </tr>
-                                  );
-                                })()}
-
-                                {blockCost > 0 && (() => {
-                                  sNo++;
-                                  return (
-                                    <tr className="border-b border-gray-200 hover:bg-gray-50/50">
-                                      <td className="py-2.5 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{sNo}</td>
-                                      <td className="py-2.5 px-4 font-semibold text-gray-900 border-r border-gray-300">
-                                        <div>Block Making Cost</div>
-                                        <div className="text-[11px] text-gray-500 font-normal">As a One time cost</div>
-                                      </td>
-                                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">1</td>
-                                      <td className="py-2.5 px-3 text-center text-gray-700 border-r border-gray-300">Nos</td>
-                                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
-                                        {blockCost.toFixed(2)}
-                                      </td>
-                                      <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900">
-                                        {blockCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </td>
-                                    </tr>
-                                  );
-                                })()}
-
-                                {oneTimeTransport > 0 && (() => {
-                                  sNo++;
-                                  return (
-                                    <tr className="border-b border-gray-200 hover:bg-gray-50/50">
-                                      <td className="py-2.5 px-3 text-center font-medium text-gray-600 border-r border-gray-300">{sNo}</td>
-                                      <td className="py-2.5 px-4 font-semibold text-gray-900 border-r border-gray-300">
-                                        <div>Transport Cost</div>
-                                        <div className="text-[11px] text-gray-500 font-normal">Fixed order delivery transport charge</div>
-                                      </td>
-                                      <td className="py-2.5 px-3 text-right font-semibold text-gray-900 border-r border-gray-300">1</td>
-                                      <td className="py-2.5 px-3 text-center text-gray-700 border-r border-gray-300">Trip</td>
-                                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-gray-900 border-r border-gray-300">
-                                        {oneTimeTransport.toFixed(2)}
-                                      </td>
-                                      <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900">
-                                        {oneTimeTransport.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </td>
-                                    </tr>
-                                  );
-                                })()}
-                              </>
-                            );
-                          })()}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Total Summary Breakdown */}
-                    <div className="mt-5 flex flex-col sm:flex-row justify-between items-start gap-4">
-                      <div className="text-xs sm:text-sm font-semibold text-gray-800 pt-1">
-                        <span className="font-bold text-gray-900">Transport - </span>
-                        <span>
-                          {selectedQuote.transport_option || 
-                            (selectedQuote.has_transport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)')}
-                        </span>
-                      </div>
-                      <div className="w-full sm:w-72 space-y-1.5 text-xs sm:text-sm ml-auto">
-                        {isVatCustomer ? (
-                          <>
-                            <div className="flex justify-between py-1 text-gray-700 border-b border-gray-100">
-                              <span className="font-semibold">Sub Total:</span>
-                              <span className="font-mono font-bold">
-                                Rs. {subtotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                            <div className="flex justify-between py-1 text-gray-700 border-b border-gray-100">
-                              <span className="font-semibold">Vat - 18%:</span>
-                              <span className="font-mono font-bold">
-                                Rs. {vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                            <div className="flex justify-between py-2 text-base font-black text-gray-900 border-t-2 border-b-2 border-gray-900 mt-1">
-                              <span>Total:</span>
-                              <span className="font-mono">
-                                Rs. {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex justify-between py-2 text-base font-black text-gray-900 border-t-2 border-b-2 border-gray-900">
-                            <span>Total:</span>
-                            <span className="font-mono">
-                              Rs. {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Document Footer Notes & Signatures */}
-                  <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-600 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
-                    <div className="space-y-2">
-                      <p className="font-bold text-gray-800 text-sm">
-                        {isVatCustomer ? 'Chelsy Packaging Solutions (Pvt) Ltd.' : 'Chelsy Packaging Pvt Ltd'}
-                      </p>
-                      
-                      {/* Special Conditions / Terms */}
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 max-w-md space-y-1">
-                        <p className="font-bold text-gray-700 text-[11px] uppercase tracking-wider mb-1">Terms & Conditions:</p>
-                        <p className="text-xs text-black flex items-start gap-1.5 font-bold">
-                          <span className="font-black text-black">1. Payment Method:</span>
-                          <span className="font-black text-black">{paymentMethodDisplay}</span>
-                        </p>
-                        <p className="text-[11px] text-gray-600 flex items-start gap-1.5">
-                          <span className="font-semibold text-gray-700">2. Quotation Validity:</span>
-                          <span className="font-normal text-gray-700">14 days from quote date.</span>
-                        </p>
-                        <p className="text-[11px] text-gray-600 flex items-start gap-1.5">
-                          <span className="font-semibold text-gray-700">3. Delivery Timeline:</span>
-                          <span className="font-normal text-gray-700">7-10 working days upon confirmed Purchase Order.</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Right Column: Bank Account Details (Marked Area) + Authorized Signature */}
-                    <div className="flex flex-col items-start sm:items-end justify-between gap-4 w-full sm:w-auto">
-                      {/* Bank Account Details Box */}
-                      <div className="bg-gray-50 border border-gray-300 rounded-xl p-2.5 sm:p-3 text-left w-full sm:w-64 text-[11px] shadow-xs">
-                        <p className="font-bold text-gray-800 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1 border-b border-gray-200 pb-1">
-                          <span>🏦</span> Bank Account Details
-                        </p>
-                        {isVatCustomer ? (
-                          <div className="space-y-0.5 text-gray-800 text-[11px]">
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">A/C No:</span>
-                              <span className="font-mono font-bold text-black text-xs">0110-13429295-001</span>
-                            </p>
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">A/C Name:</span>
-                              <span className="font-medium text-gray-900 text-right">Chelsy Packaging Solutions Pvt Ltd</span>
-                            </p>
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">Bank / Branch:</span>
-                              <span className="font-medium text-gray-900 text-right">Seylan Bank - Gampaha</span>
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-0.5 text-gray-800 text-[11px]">
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">A/C No:</span>
-                              <span className="font-mono font-bold text-black text-xs">1000448465</span>
-                            </p>
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">A/C Name:</span>
-                              <span className="font-medium text-gray-900 text-right">Chelsy Packaging Pvt Ltd.</span>
-                            </p>
-                            <p className="flex justify-between gap-2">
-                              <span className="font-semibold text-gray-700">Bank / Branch:</span>
-                              <span className="font-medium text-gray-900 text-right">Commercial Bank, Weliweriya branch</span>
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Signature line */}
-                      <div className="text-left sm:text-right w-full sm:w-auto pt-1">
-                        <div className="w-48 sm:ml-auto border-b border-gray-400 mb-1"></div>
-                        <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Authorized Signature</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Action Buttons: Delete Quote, Save as PDF, Print Quotation, Close */}
-              <div className="no-print-zone mt-4 pt-3 border-t border-gray-200 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no)}
-                  style={{
-                    backgroundColor: isDark ? 'rgba(69, 10, 10, 0.6)' : '#fee2e2',
-                    color: isDark ? '#f87171' : '#b91c1c',
-                    borderColor: isDark ? '#991b1b' : '#fca5a5'
-                  }}
-                  className="font-bold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5 hover:opacity-90"
-                >
-                  <span>🗑️</span> Delete Quote
-                </button>
-                <button
-                  type="button"
-                  disabled={downloadingPdf}
-                  onClick={() => handleSavePdf(selectedQuote, displayQuoteNo)}
-                  style={{
-                    backgroundColor: '#059669',
-                    color: '#ffffff',
-                    borderColor: '#047857'
-                  }}
-                  className={`font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:opacity-90 hover:scale-[1.01] ${downloadingPdf ? 'opacity-70 cursor-not-allowed' : ''}`}
-                  title="Save quotation directly as a PDF document"
-                >
-                  {downloadingPdf ? (
-                    <>
-                      <span className="animate-spin">⏳</span> Generating...
-                    </>
-                  ) : (
-                    <>
-                      <span>📥</span> Save as PDF
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const prevTitle = document.title;
-                    document.title = `Quotation_${displayQuoteNo}_${(selectedQuote.customer_name || 'Customer').replace(/\s+/g, '_')}`;
-                    window.print();
-                    setTimeout(() => { document.title = prevTitle; }, 1000);
-                  }}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    borderColor: '#1d4ed8'
-                  }}
-                  className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:opacity-90 hover:scale-[1.01]"
-                  title="Print quotation directly to printer"
-                >
-                  <span>🖨️</span> Print Quotation
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    cleanOverlays();
-                    setSelectedQuote(null);
-                  }}
-                  style={{
-                    backgroundColor: isDark ? '#1a2332' : '#2d2417',
-                    color: '#ffffff',
-                    borderColor: isDark ? '#334155' : '#443422',
-                    cursor: 'pointer'
-                  }}
-                  className="font-extrabold py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer hover:opacity-90 shadow-md text-xs sm:text-sm flex items-center justify-center relative z-20"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

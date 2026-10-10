@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import OfficialQuotationModal from './OfficialQuotationModal';
 
 // ============================================================================
 // PREMIUM SVG VISUALIZATION COMPONENTS
@@ -440,6 +441,12 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   const isDark = theme === 'dark';
   const isSand = theme === 'sand';
   const isGreen = !isDark && !isSand;
+
+  // Multi-item quotation states
+  const [quotationItems, setQuotationItems] = useState([]);
+  const [showQuotationModal, setShowQuotationModal] = useState(false);
+  const [saveMultiLoading, setSaveMultiLoading] = useState(false);
+  const [addedItemSuccess, setAddedItemSuccess] = useState('');
 
   // Convert input dimension value to mm rounded to nearest whole mm for all internal formulas and database persistence
   const toMM = (val) => {
@@ -1072,6 +1079,162 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
   const totalInvoiceValue = finalCostPerCarton * quantityNum;
   const totalBatchCost = totalInvoiceValue;
 
+  const handleAddItemToQuotation = () => {
+    if (!calculatedCost) {
+      setError('Please calculate the cost first before adding this item to the quotation.');
+      return;
+    }
+
+    const isSF = formData.cartonType === 'S.F.';
+    const plyClean = (formData.plyType || '3-Ply').replace('-', ' ');
+    const isPrinted = Boolean(formData.isPrinted);
+
+    let dimStr;
+    if (isSF) {
+      dimStr = `${formData.dieLength || 0}×${formData.dieWidth || 0} ${dimUnit}`;
+    } else {
+      dimStr = `${formData.cartonLength || 0}×${formData.cartonWidth || 0}×${formData.cartonHeight || 0} ${dimUnit}`;
+    }
+
+    let descStr;
+    if (isSF) {
+      const isSheet = formData.plyType === '2-Ply' || formData.plyType === '4-Ply';
+      const productNoun = isSheet ? (isPrinted ? 'Printed Sheet' : 'Sheet') : (isPrinted ? 'Printed Boards' : 'Boards');
+      descStr = `${dimStr} - ${plyClean} ${productNoun} - S.F.`;
+    } else {
+      const productNoun = isPrinted ? 'Printed Carton' : 'Carton';
+      const typeStr = formData.cartonType ? `${formData.cartonType} Type` : 'RSC Type';
+      descStr = `${dimStr} - ${plyClean} ${productNoun} - ${typeStr}`;
+    }
+
+    const gsmArray = [];
+    const maxGSM = formData.plyType === '7-Ply' ? 7 : (formData.plyType === '5-Ply' ? 5 : (formData.plyType === '4-Ply' ? 4 : (formData.plyType === '3-Ply' ? 3 : 2)));
+    for (let i = 1; i <= maxGSM; i++) {
+      gsmArray.push(formData[`gsm${i}`] || '');
+    }
+
+    const newItem = {
+      item_no: quotationItems.length + 1,
+      description: descStr,
+      dimensions: dimStr,
+      dimension_unit: dimUnit,
+      carton_type: formData.cartonType || 'RSC',
+      cartonLength: formData.cartonLength || '',
+      cartonWidth: formData.cartonWidth || '',
+      cartonHeight: formData.cartonHeight || '',
+      carton_length_mm: toMM(formData.cartonLength),
+      carton_width_mm: toMM(formData.cartonWidth),
+      carton_height_mm: toMM(formData.cartonHeight),
+      dieLength: formData.dieLength || '',
+      dieWidth: formData.dieWidth || '',
+      die_length_mm: toMM(formData.dieLength),
+      die_width_mm: toMM(formData.dieWidth),
+      carton_length_input: String(formData.cartonLength || ''),
+      carton_width_input: String(formData.cartonWidth || ''),
+      carton_height_input: String(formData.cartonHeight || ''),
+      die_length_input: String(formData.dieLength || ''),
+      die_width_input: String(formData.dieWidth || ''),
+      ply_type: formData.plyType || '3-Ply',
+      board_type: formData.boardType || 'Brown Liner',
+      flute_type: formData.fluteType || 'B-Flute',
+      flute_type_2: formData.fluteType2 || formData.fluteType || 'B-Flute',
+      production_method: formData.productionMethod || 'In-house',
+      is_printed: isPrinted,
+      quantity: quantityNum,
+      final_cost_per_carton: finalCostPerCarton,
+      total_cost_batch: totalBatchCost,
+      white_liner_rate: formData.whiteLinerRate,
+      brown_liner_rate: formData.brownLinerRate,
+      gsm_values: gsmArray,
+      calculated_cost: calculatedCost
+    };
+
+    setQuotationItems(prev => [...prev, newItem]);
+    setAddedItemSuccess(`Item ${quotationItems.length + 1} added to quotation! Enter next item specs below.`);
+    setTimeout(() => setAddedItemSuccess(''), 5000);
+
+    // Reset item specific fields for next item entry
+    setFormData(prev => ({
+      ...prev,
+      cartonLength: '',
+      cartonWidth: '',
+      cartonHeight: '',
+      dieLength: '',
+      dieWidth: '',
+      quantity: '',
+      joiningCost: '',
+      joiningCostManual: false,
+      printCost: '',
+      printCostManual: false,
+      slottingCost: '',
+      slottingCostManual: false,
+      bundlingCost: '',
+      bundlingCostManual: false,
+      diecuttingCost: '',
+    }));
+    setCalculatedCost(null);
+  };
+
+  const handleRemoveItem = (index) => {
+    setQuotationItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveMultiItemQuote = async () => {
+    if (quotationItems.length === 0) {
+      setError('Please add at least one item to the quotation before saving.');
+      return;
+    }
+    if (!formData.customerName) {
+      setError('Customer name is required.');
+      return;
+    }
+
+    setSaveMultiLoading(true);
+    setError('');
+    try {
+      const response = await axios.post('/api/quotes/save', {
+        customerName: formData.customerName,
+        items: quotationItems,
+        taxType: formData.taxType || 'Non-VAT',
+        transportOption: formData.transportOption,
+        hasTransport: formData.transportOption === 'Including transport',
+        oneTimeDieCost: formData.oneTimeDieCost || '',
+        oneTimeBlockCost: formData.oneTimeBlockCost || '',
+        oneTimeTransportCost: formData.oneTimeTransportCost || '',
+        paymentMethod: formData.paymentMethod || 'Credit - 30 Days'
+      }, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      });
+
+      alert(`Multi-item quote saved successfully! Order No: ${response.data.quote_no}`);
+      setQuotationItems([]);
+      fetchNextQuoteNumber();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save multi-item quote.');
+    } finally {
+      setSaveMultiLoading(false);
+    }
+  };
+
+  const compiledQuoteForPreview = useMemo(() => {
+    if (quotationItems.length === 0) return null;
+    const totalBatchSum = quotationItems.reduce((acc, it) => acc + (parseFloat(it.total_cost_batch) || 0), 0);
+    return {
+      quote_no: nextQuoteNo ? `QT-${nextQuoteNo}` : 'QT-NEW',
+      customer_name: formData.customerName || 'Customer',
+      created_at: new Date().toISOString(),
+      items: quotationItems,
+      total_cost_batch: totalBatchSum,
+      tax_type: formData.taxType || 'Non-VAT',
+      transport_option: formData.transportOption,
+      has_transport: formData.transportOption === 'Including transport',
+      die_making_cost: parseFloat(formData.oneTimeDieCost || 0),
+      block_making_cost: parseFloat(formData.oneTimeBlockCost || 0),
+      one_time_transport_cost: parseFloat(formData.oneTimeTransportCost || 0),
+      payment_method: formData.paymentMethod || 'Credit - 30 Days'
+    };
+  }, [quotationItems, nextQuoteNo, formData]);
+
   return (
     <div className={`rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-left border ${
       isDark 
@@ -1103,9 +1266,144 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
         )}
       </div>
 
+      {addedItemSuccess && (
+        <div className="bg-emerald-100 dark:bg-emerald-950/60 border-l-4 border-emerald-600 p-4 mb-6 rounded-lg text-sm flex items-center justify-between">
+          <p className="text-emerald-800 dark:text-emerald-200 font-bold">✅ {addedItemSuccess}</p>
+          <button
+            type="button"
+            onClick={() => setShowQuotationModal(true)}
+            className="text-xs font-black underline text-emerald-900 dark:text-emerald-100 hover:opacity-80 cursor-pointer ml-2"
+          >
+            Preview Quotation →
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-100 border-l-4 border-red-600 p-4 mb-6 rounded-lg text-sm">
           <p className="text-red-700">❌ {error}</p>
+        </div>
+      )}
+
+      {/* COMPILED MULTI-ITEM QUOTATION TRAY */}
+      {quotationItems.length > 0 && (
+        <div className={`p-6 rounded-3xl mb-6 border shadow-xl transition-all duration-300 ${
+          isDark 
+            ? 'bg-gradient-to-br from-[#1a2332] to-[#131924] border-[#c5a880]/40 text-[#e2d4c0]' 
+            : isSand
+              ? 'bg-[#faf8f5] border-[#dfd5bc] text-[#5c4c36]'
+              : 'bg-[#eaf5ea] border-[#86efac] text-[#14532d]'
+        }`}>
+          <div className="flex flex-wrap items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-700 gap-2">
+            <div>
+              <h3 className="text-lg font-black flex items-center gap-2 m-0 p-0">
+                <span>📋</span> Compiled Quotation Tray ({quotationItems.length} {quotationItems.length === 1 ? 'Item' : 'Items'})
+              </h3>
+              <p className="text-xs opacity-80 mt-0.5">
+                Customer: <strong className="font-bold">{formData.customerName || 'Pending Customer Name'}</strong>
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowQuotationModal(true)}
+                style={{
+                  backgroundColor: isDark ? '#d4af37' : '#8c734b',
+                  color: isDark ? '#0f172a' : '#ffffff'
+                }}
+                className="font-black px-4 py-2 rounded-xl text-xs sm:text-sm shadow-md transition cursor-pointer hover:scale-[1.02] flex items-center gap-1.5"
+                title="View full official quotation report with all items compiled"
+              >
+                <span>🔍</span> View Costing Summary Modal
+              </button>
+              
+              <button
+                type="button"
+                disabled={saveMultiLoading}
+                onClick={handleSaveMultiItemQuote}
+                className={`font-black px-4 py-2 rounded-xl text-xs sm:text-sm shadow-md transition cursor-pointer hover:scale-[1.02] flex items-center gap-1.5 ${
+                  isDark
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                } ${saveMultiLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                title="Save all items compiled into one quotation order in database"
+              >
+                <span>💾</span> {saveMultiLoading ? 'Saving...' : 'Save Multi-Item Quote'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Clear all items currently in this quotation tray?')) {
+                    setQuotationItems([]);
+                  }
+                }}
+                className="font-bold px-3 py-2 rounded-xl text-xs bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-950/60 dark:text-red-300 cursor-pointer transition"
+                title="Clear tray"
+              >
+                🗑️ Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Items Table */}
+          <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-slate-700/60 mb-4 bg-white dark:bg-slate-900/60">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 font-bold border-b border-gray-200 dark:border-slate-700">
+                <tr>
+                  <th className="py-2.5 px-3 text-center w-10">#</th>
+                  <th className="py-2.5 px-3">Item Description</th>
+                  <th className="py-2.5 px-3 text-right">Quantity</th>
+                  <th className="py-2.5 px-3 text-right">Unit Price</th>
+                  <th className="py-2.5 px-3 text-right">Total Amount</th>
+                  <th className="py-2.5 px-3 text-center w-12">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-800 text-gray-900 dark:text-slate-200">
+                {quotationItems.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/40">
+                    <td className="py-2.5 px-3 text-center font-bold text-gray-500">{idx + 1}</td>
+                    <td className="py-2.5 px-3 font-semibold">
+                      <div>{item.description}</div>
+                      <div className="text-[11px] opacity-75 font-normal">
+                        {item.flute_type} • {item.board_type}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                      {item.quantity?.toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                      Rs. {item.final_cost_per_carton?.toFixed(2)}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                      Rs. {item.total_cost_batch?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(idx)}
+                        className="text-red-500 hover:text-red-700 cursor-pointer text-sm font-bold"
+                        title="Remove item"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Running Totals */}
+          <div className="flex flex-wrap justify-between items-center text-xs sm:text-sm font-bold pt-2 border-t border-gray-200 dark:border-slate-700">
+            <div>
+              Total Quantity: <span className="font-mono text-base">{quotationItems.reduce((acc, it) => acc + (it.quantity || 0), 0).toLocaleString()}</span> units
+            </div>
+            <div className="text-right">
+              Compiled Subtotal: <span className="font-mono text-lg text-emerald-700 dark:text-[#d4af37]">Rs. {quotationItems.reduce((acc, it) => acc + (it.total_cost_batch || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2063,27 +2361,54 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={saveQuote}
-              style={{
-                backgroundColor: isDark ? '#d4af37' : '#ffffff',
-                color: isDark ? '#0f172a' : isSand ? '#5c4c36' : '#14532d',
-                visibility: 'visible',
-                display: 'inline-block'
-              }}
-              className={`font-black py-3 px-8 rounded-2xl shadow-lg transition duration-150 cursor-pointer hover:scale-[1.03] active:scale-[0.97] ${
-                isDark 
-                  ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
-                  : isSand
-                    ? 'bg-white hover:bg-[#faf8f5] text-[#5c4c36]'
-                    : 'bg-white hover:bg-[#faf8f5] text-[#14532d]'
-              }`}
-            >
-              💾 Save Quote
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleAddItemToQuotation}
+                style={{
+                  backgroundColor: isDark ? '#d4af37' : '#ffffff',
+                  color: isDark ? '#0f172a' : isSand ? '#5c4c36' : '#14532d',
+                  visibility: 'visible',
+                  display: 'inline-flex'
+                }}
+                className={`font-black py-3 px-6 rounded-2xl shadow-lg transition duration-150 cursor-pointer hover:scale-[1.03] active:scale-[0.97] items-center gap-2 ${
+                  isDark 
+                    ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
+                    : isSand
+                      ? 'bg-white hover:bg-[#faf8f5] text-[#5c4c36]'
+                      : 'bg-white hover:bg-[#faf8f5] text-[#14532d]'
+                }`}
+                title="Add this item into the compiled quotation"
+              >
+                <span>➕</span> Add Item to Quotation
+              </button>
+
+              <button
+                type="button"
+                onClick={saveQuote}
+                className={`font-bold py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
+                  isDark 
+                    ? 'bg-[#1a2332]/80 border-[#c5a880]/30 text-[#e2d4c0] hover:bg-[#1a2332]' 
+                    : isSand
+                      ? 'bg-[#5c4c36]/20 border-white/50 text-white hover:bg-[#5c4c36]/30'
+                      : 'bg-[#14532d]/20 border-white/50 text-white hover:bg-[#14532d]/30'
+                }`}
+                title="Save directly as a single item quote"
+              >
+                💾 Save Single Quote
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* OFFICIAL QUOTATION PREVIEW MODAL */}
+      {showQuotationModal && compiledQuoteForPreview && (
+        <OfficialQuotationModal
+          quote={compiledQuoteForPreview}
+          onClose={() => setShowQuotationModal(false)}
+          theme={theme}
+        />
       )}
     </div>
   );
