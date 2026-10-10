@@ -1140,6 +1140,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       flute_type_2: formData.fluteType2 || formData.fluteType || 'B-Flute',
       production_method: formData.productionMethod || 'In-house',
       is_printed: isPrinted,
+      print_name: formData.printName || '',
       quantity: quantityNum,
       final_cost_per_carton: finalCostPerCarton,
       total_cost_batch: totalBatchCost,
@@ -1162,6 +1163,8 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       dieLength: '',
       dieWidth: '',
       quantity: '',
+      isPrinted: false,
+      printName: '',
       joiningCost: '',
       joiningCostManual: false,
       printCost: '',
@@ -1367,6 +1370,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
                     <td className="py-2.5 px-3 font-semibold">
                       <div>{item.description}</div>
                       <div className="text-[11px] opacity-75 font-normal">
+                        {item.print_name && <span className="font-semibold text-blue-600 dark:text-blue-400 mr-1.5">[Print: {item.print_name}]</span>}
                         {item.flute_type} • {item.board_type}
                       </div>
                     </td>
@@ -1803,9 +1807,42 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
               </div>
             </div>
 
-            <div className="flex items-center gap-2 mb-4 cursor-pointer">
-              <input type="checkbox" name="isPrinted" checked={formData.isPrinted} onChange={handleInputChange} id="isPrinted" className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer" />
-              <label htmlFor="isPrinted" className="text-sm font-bold select-none cursor-pointer">Printed Option</label>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  name="isPrinted" 
+                  checked={formData.isPrinted} 
+                  onChange={handleInputChange} 
+                  id="isPrinted" 
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer" 
+                />
+                <label htmlFor="isPrinted" className="text-sm font-bold select-none cursor-pointer">
+                  Printed Option
+                </label>
+              </div>
+
+              {formData.isPrinted && (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="printName" className="text-xs font-bold whitespace-nowrap opacity-80">
+                    Print Name:
+                  </label>
+                  <input
+                    type="text"
+                    id="printName"
+                    name="printName"
+                    maxLength={12}
+                    placeholder="Max 12 chars"
+                    value={formData.printName || ''}
+                    onChange={handleInputChange}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-xl border-2 outline-none transition w-44 bg-white dark:bg-slate-900 border-blue-400 dark:border-blue-500/60 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/30"
+                    title="Carton print identification name (max 12 characters)"
+                  />
+                  <span className="text-[11px] font-mono opacity-60">
+                    {(formData.printName || '').length}/12
+                  </span>
+                </div>
+              )}
             </div>
 
             {formData.isPrinted && (

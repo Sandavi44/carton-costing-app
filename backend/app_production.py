@@ -192,6 +192,7 @@ class Quote(db.Model):
     one_time_transport_cost = db.Column(db.Float, default=0.0)
     payment_method = db.Column(db.String(100), default="Credit - 30 Days")
     items = db.Column(db.Text, nullable=True)  # JSON-encoded array of items for multi-item quotes
+    print_name = db.Column(db.String(50), nullable=True)  # Print identification name (max 12 chars in UI)
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -205,6 +206,44 @@ class SystemParameter(db.Model):
     value = db.Column(db.String(500), nullable=False)
     description = db.Column(db.String(500))
     last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+def seed_or_update_default_users():
+    """Ensure Admin, Manoj, and Kaushalya exist with specified credentials and authorities"""
+    users_config = [
+        {
+            'username': 'Admin',
+            'password_hash': os.getenv('ADMIN_PASSWORD_HASH', 'scrypt:32768:8:1$zhmVwXm3WTzYFZ44$01bc26227cb45b9f045dd4efe27b49a2dbe08ade7b5600c8b0084db0318851428bc197ea280e789ecaeeec0e1a575df289ba86ae73bf7e72db066b0fcc6db088'),
+            'email': 'admin@app.internal',
+            'is_admin': True,
+        },
+        {
+            'username': 'Manoj',
+            'password_hash': os.getenv('MANOJ_PASSWORD_HASH', 'scrypt:32768:8:1$MX3qCHD2VjZFfGA4$279b5fc250e9cfc5ffd1c1bc1c14fc175970c325bc216568f53e8df909c67fb8c4680359ee323c79b2c676edb4c877d88255e9ab7cb707034d74ec70d14f421f'),
+            'email': 'manoj@app.internal',
+            'is_admin': False,
+        },
+        {
+            'username': 'Kaushalya',
+            'password_hash': os.getenv('KAUSHALYA_PASSWORD_HASH', 'scrypt:32768:8:1$MVwYwLWkJV9tCMQu$7c06e024062e99238c7a8ef52be13397cacf1f51d19142f7db5edcdf25f338eddf3a7b9a4e1a5bcd9d41b4bb6a3e8e630ff8057dae8ef0b54abe42f37d95e426'),
+            'email': 'kaushalya@app.internal',
+            'is_admin': False,
+        }
+    ]
+    for conf in users_config:
+        try:
+            u = User.query.filter(db.func.lower(User.username) == conf['username'].lower()).first()
+            if not u:
+                u = User(username=conf['username'], email=conf['email'], is_admin=conf['is_admin'])
+                u.password_hash = conf.get('password_hash') or u.password_hash
+                db.session.add(u)
+            else:
+                u.username = conf['username']
+                u.password_hash = conf.get('password_hash') or u.password_hash
+                u.is_admin = conf['is_admin']
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 
 _columns_checked = False
@@ -233,6 +272,7 @@ def ensure_db_columns_exist():
                 ("die_width_input", "VARCHAR(50)"),
                 ("transport_option", "VARCHAR(100) DEFAULT 'Ex factory price from Biyagama factory ( No transport)'"),
                 ("items", "TEXT"),
+                ("print_name", "VARCHAR(50)"),
             ]
             is_postgres = db.engine.dialect.name == 'postgresql'
             for col_name, col_type in migration_cols:
@@ -264,6 +304,9 @@ def ensure_db_columns_exist():
                 except Exception:
                     db.session.rollback()
 
+            # Seed / sync required users
+            seed_or_update_default_users()
+
             _columns_checked = True
         except Exception:
             pass
@@ -290,18 +333,24 @@ def register():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """Login user"""
+    """Login user with case-insensitive username match"""
     try:
         data = request.get_json()
-        user = User.query.filter_by(username=data.get('username')).first()
+        req_username = (data.get('username') or '').strip()
+        user = User.query.filter(db.func.lower(User.username) == req_username.lower()).first()
         
-        if not user or not user.check_password(data.get('password')):
+        if not user or not user.check_password(data.get('password', '')):
             return jsonify({'error': 'Invalid credentials'}), 401
         
         access_token = create_access_token(identity=str(user.id))
         return jsonify({
             'access_token': access_token,
-            'user': {'id': user.id, 'username': user.username, 'is_admin': user.is_admin}
+            'user': {
+                'id': user.id, 
+                'username': user.username, 
+                'is_admin': user.is_admin,
+                'can_delete': user.is_admin
+            }
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -509,7 +558,8 @@ def save_quote():
             overall_batch_cost = None
 
         overhead_per_carton = total_overhead / overall_quantity if overall_quantity > 0 else 0
-        
+        print_name = str(first_item.get('print_name') or first_item.get('printName') or data.get('print_name') or data.get('printName') or '')[:50]
+
         # Create quote
         quote = Quote(
             user_id=user_id,
@@ -535,6 +585,7 @@ def save_quote():
             die_width_mm=round(safe_float(first_item.get('dieWidth') or first_item.get('die_width_mm', 0))),
             joining_type=first_item.get('joiningType') or first_item.get('joining_type', 'Glued'),
             is_printed=bool(first_item.get('isPrinted') or first_item.get('is_printed', False)),
+            print_name=print_name,
             gsm_values=json.dumps(gsm_values),
             white_liner_rate=safe_float(first_item.get('whiteLinerRate', data.get('whiteLinerRate', 0))),
             brown_liner_rate=safe_float(first_item.get('brownLinerRate', data.get('brownLinerRate', 0))),
@@ -655,6 +706,7 @@ def get_quote_history():
                 'payment_method': getattr(quote, 'payment_method', 'Credit - 30 Days') or 'Credit - 30 Days',
                 'quantity': quote.quantity,
                 'is_printed': bool(quote.is_printed),
+                'print_name': getattr(quote, 'print_name', None) or '',
                 'joining_type': quote.joining_type,
                 'joining_cost': quote.joining_cost,
                 'print_cost': quote.print_cost,
@@ -729,6 +781,7 @@ def get_quote(quote_id):
             'die_width_mm': round(getattr(quote, 'die_width_mm', 0.0) or 0.0),
             'joining_type': quote.joining_type,
             'is_printed': quote.is_printed,
+            'print_name': getattr(quote, 'print_name', None) or '',
             'gsm_values': json.loads(quote.gsm_values) if quote.gsm_values else [],
             'white_liner_rate': quote.white_liner_rate,
             'brown_liner_rate': quote.brown_liner_rate,
@@ -782,15 +835,14 @@ def get_quote(quote_id):
 @app.route('/api/quotes/<int:quote_id>', methods=['DELETE'])
 @jwt_required()
 def delete_quote(quote_id):
-    """Delete a specific quote by ID"""
+    """Delete a specific quote by ID - requires Admin authority"""
     try:
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
-        if user and user.is_admin:
-            quote = Quote.query.filter_by(id=quote_id).first()
-        else:
-            quote = Quote.query.filter_by(id=quote_id, user_id=user_id).first()
+        if not user or not user.is_admin:
+            return jsonify({'error': 'You do not have deleting authority. Only Admin can delete quotations.'}), 403
 
+        quote = Quote.query.filter_by(id=quote_id).first()
         if not quote:
             return jsonify({'error': 'Quote not found'}), 404
 

@@ -29,6 +29,7 @@ function App() {
     fluteType2: 'B-Flute',
     joiningType: 'Glued',
     isPrinted: false,
+    printName: '',
     whiteLinerRate: '',
     brownLinerRate: '260',
     gsm1: '140',
@@ -321,6 +322,7 @@ function App() {
         )}
         {activeTab === 'history' && (
           <QuoteHistory 
+            user={user}
             setFormData={setFormData} 
             setCalculatedCost={setCalculatedCost} 
             setActiveTab={setActiveTab} 

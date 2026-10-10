@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import OfficialQuotationModal from './OfficialQuotationModal';
 
-export default function QuoteHistory({ setFormData, setCalculatedCost, setActiveTab, theme }) {
+export default function QuoteHistory({ user, setFormData, setCalculatedCost, setActiveTab, theme }) {
   const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Deleting authority: only Admin can delete quotes
+  const canDelete = Boolean(user?.is_admin || user?.can_delete);
 
   // Modals / Action States
   const [actionPromptQuote, setActionPromptQuote] = useState(null);
@@ -189,6 +192,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         isEditing: true,
         joiningType: quote.joining_type || 'Glued',
         isPrinted: quote.is_printed || false,
+        printName: quote.print_name || '',
         whiteLinerRate: (quote.board_type && quote.board_type.toLowerCase().includes('white')) ? (quote.white_liner_rate || '') : '',
         brownLinerRate: (!quote.board_type || !quote.board_type.toLowerCase().includes('white')) ? (quote.brown_liner_rate || '') : '',
         gsm1: gsmArray[0] !== undefined ? gsmArray[0].toString() : '',
@@ -649,13 +653,15 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
                       >
                         Open Options
                       </button>
-                      <button
-                        onClick={() => handleDeleteQuote(quote.id, quote.quote_no)}
-                        className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
-                        title="Delete Quote"
-                      >
-                        🗑️
-                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDeleteQuote(quote.id, quote.quote_no)}
+                          className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
+                          title="Delete Quote"
+                        >
+                          🗑️
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -713,12 +719,14 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
               >
                 💻 Load Costing Data to Workspace (Edit)
               </button>
-              <button
-                onClick={() => handleDeleteQuote(actionPromptQuote.id, actionPromptQuote.quote_no)}
-                className="w-full font-bold py-2.5 rounded-2xl transition block text-sm text-center cursor-pointer hover:scale-[1.01] border text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
-              >
-                🗑️ Delete Quote
-              </button>
+              {canDelete && (
+                <button
+                  onClick={() => handleDeleteQuote(actionPromptQuote.id, actionPromptQuote.quote_no)}
+                  className="w-full font-bold py-2.5 rounded-2xl transition block text-sm text-center cursor-pointer hover:scale-[1.01] border text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
+                >
+                  🗑️ Delete Quote
+                </button>
+              )}
               <button
                 onClick={() => setActionPromptQuote(null)}
                 className={`w-full font-semibold py-2.5 rounded-2xl transition block text-xs text-center cursor-pointer border ${
@@ -737,7 +745,7 @@ export default function QuoteHistory({ setFormData, setCalculatedCost, setActive
         <OfficialQuotationModal
           quote={selectedQuote}
           onClose={() => setSelectedQuote(null)}
-          onDelete={selectedQuote.id && !String(selectedQuote.id).startsWith('compiled-') ? () => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no) : null}
+          onDelete={canDelete && selectedQuote.id && !String(selectedQuote.id).startsWith('compiled-') ? () => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no) : null}
           theme={theme}
         />
       )}

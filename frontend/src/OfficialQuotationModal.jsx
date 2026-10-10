@@ -124,8 +124,12 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
     const qty = parseInt(item.quantity || 0, 10);
     const cartonAmount = unitPrice * qty;
 
+    const printName = (item.print_name || item.printName || quote.print_name || quote.printName || '').trim();
+    const printTypeDisplay = isPrinted ? (printName || 'Printed') : 'Plain';
+
     return {
       descStr,
+      printTypeDisplay,
       fluteDisplay,
       boardDisplay,
       qty,
@@ -393,6 +397,7 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
                       <td className="py-3 px-4 font-semibold text-gray-900 border-r border-gray-300">
                         <div>{item.descStr}</div>
                         <div className="text-[11px] text-gray-600 font-normal mt-1 space-y-0.5">
+                          <div><span className="font-semibold text-gray-700">Print Type:</span> {item.printTypeDisplay}</div>
                           <div><span className="font-semibold text-gray-700">Flute Type:</span> {item.fluteDisplay}</div>
                           <div><span className="font-semibold text-gray-700">Board Type:</span> {item.boardDisplay}</div>
                         </div>
