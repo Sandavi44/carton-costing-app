@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-export default function OfficialQuotationModal({ quote, onClose, onDelete, theme = 'green' }) {
+export default function OfficialQuotationModal({ quote, user, onClose, onDelete, theme = 'green' }) {
   const [reportTaxFormat, setReportTaxFormat] = useState('auto');
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const originatorName = quote?.originator_name || quote?.prepared_by || quote?.created_by || quote?.user?.username || (user && user.username) || 'Admin';
 
   const isDark = theme === 'dark';
   const isSand = theme === 'sand';
@@ -635,9 +637,15 @@ export default function OfficialQuotationModal({ quote, onClose, onDelete, theme
                   )}
                 </div>
 
-                <div className="text-left sm:text-right w-full sm:w-auto pt-1">
-                  <div className="w-48 sm:ml-auto border-b border-gray-400 mb-1"></div>
-                  <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Authorized Signature</p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 w-full pt-2">
+                  <div className="text-left text-xs text-gray-700 whitespace-nowrap">
+                    <span className="font-semibold text-gray-600">Costing prepared by: </span>
+                    <span className="font-black text-gray-900">{originatorName}</span>
+                  </div>
+                  <div className="text-left sm:text-right w-full sm:w-auto">
+                    <div className="w-44 sm:ml-auto border-b border-gray-400 mb-1"></div>
+                    <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Authorized Signature</p>
+                  </div>
                 </div>
               </div>
             </div>

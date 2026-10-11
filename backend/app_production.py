@@ -709,6 +709,12 @@ def get_quote_history():
     """Get all company quote history (accessible to all authenticated users)"""
     try:
         quotes = Quote.query.order_by(Quote.created_at.desc()).all()
+        user_map = {}
+        try:
+            for u in User.query.all():
+                user_map[u.id] = u.username
+        except Exception:
+            pass
         
         result = []
         for quote in quotes:
@@ -731,10 +737,14 @@ def get_quote_history():
                 except Exception:
                     items_list = []
 
+            orig_name = user_map.get(quote.user_id, 'Admin')
             result.append({
                 'id': quote.id,
                 'quote_no': f"QT-{str(quote.id).zfill(5)}",
                 'customer_name': quote.customer_name,
+                'originator_name': orig_name,
+                'prepared_by': orig_name,
+                'created_by': orig_name,
                 'dimensions': dim_display,
                 'dimension_unit': dim_unit,
                 'carton_length_input': l_in,
@@ -807,10 +817,21 @@ def get_quote(quote_id):
             except Exception:
                 items_list = []
 
+        quote_user = None
+        try:
+            if quote.user_id:
+                quote_user = User.query.get(quote.user_id)
+        except Exception:
+            pass
+        originator_name = quote_user.username if quote_user else 'Admin'
+
         return jsonify({
             'id': quote.id,
             'quote_no': f"QT-{str(quote.id).zfill(5)}",
             'customer_name': quote.customer_name,
+            'originator_name': originator_name,
+            'prepared_by': originator_name,
+            'created_by': originator_name,
             'created_at': quote.created_at.strftime('%d/%m/%Y') if quote.created_at else datetime.utcnow().strftime('%d/%m/%Y'),
             'dimension_unit': getattr(quote, 'dimension_unit', 'mm') or 'mm',
             'carton_length_input': getattr(quote, 'carton_length_input', None),

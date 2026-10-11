@@ -283,13 +283,16 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
     }
   };
 
-  // Perform search filtering on full quote database client-side (checks Name or QT- Order No)
+  // Perform search filtering on full quote database client-side (checks Name, QT- Order No, Originator, Type, Print)
   const filteredQuotes = quotes.filter((quote) => {
     if (customerFilter) {
       const q = customerFilter.toLowerCase();
-      const matchesName = quote.customer_name.toLowerCase().includes(q);
-      const matchesNo = quote.quote_no?.toLowerCase().includes(q) || false;
-      if (!matchesName && !matchesNo) {
+      const matchesName = (quote.customer_name || '').toLowerCase().includes(q);
+      const matchesNo = (quote.quote_no || '').toLowerCase().includes(q);
+      const matchesOriginator = (quote.originator_name || quote.prepared_by || '').toLowerCase().includes(q);
+      const matchesType = (quote.carton_type || '').toLowerCase().includes(q);
+      const matchesPrint = (quote.is_printed ? ('printed ' + (quote.print_name || '')) : 'plain').toLowerCase().includes(q);
+      if (!matchesName && !matchesNo && !matchesOriginator && !matchesType && !matchesPrint) {
         return false;
       }
     }
@@ -385,7 +388,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5">
           <input
             type="text"
-            placeholder="Search Name or Order No..."
+            placeholder="Search Name, Order No., Originator, Type..."
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
             className={inputClass}
@@ -544,6 +547,12 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                     Customer
                   </th>
                   <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Originator
+                  </th>
+                  <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
+                    Product Details
+                  </th>
+                  <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                     Dimensions / Items
                   </th>
                   <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
@@ -604,6 +613,51 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                     }`}>
                       {quote.customer_name}
                     </td>
+
+                    {/* Originator / Prepared By Column */}
+                    <td className="px-5 py-4 whitespace-nowrap text-xs font-semibold">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shadow-xs ${
+                        (quote.originator_name || quote.prepared_by || 'Admin').toLowerCase() === 'admin'
+                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60'
+                          : (quote.originator_name || quote.prepared_by || '').toLowerCase() === 'manoj'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60'
+                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60'
+                      }`}>
+                        👤 {quote.originator_name || quote.prepared_by || 'Admin'}
+                      </span>
+                    </td>
+
+                    {/* Product Details (Type & Print) Column */}
+                    <td className="px-5 py-4 whitespace-nowrap text-xs">
+                      {quote.item_count > 1 ? (
+                        <div>
+                          <div className={`font-bold ${isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-gray-900'}`}>
+                            Multi-type
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 mt-0.5">
+                            📑 {quote.item_count} Items
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className={`font-bold ${isDark ? 'text-white' : isSand ? 'text-[#5c4c36]' : 'text-gray-900'}`}>
+                            {quote.carton_type || 'RSC'}
+                          </div>
+                          <div>
+                            {quote.is_printed ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60" title={`Printed: ${quote.print_name || 'Standard'}`}>
+                                🖨️ {quote.print_name ? `Printed (${quote.print_name})` : 'Printed'}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+                                📦 Plain
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+
                     <td className={`px-5 py-4 whitespace-nowrap font-mono text-sm ${
                       isDark ? 'text-slate-300' : isSand ? 'text-[#6b5940]' : 'text-gray-700'
                     }`}>
@@ -744,6 +798,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
       {selectedQuote && (
         <OfficialQuotationModal
           quote={selectedQuote}
+          user={user}
           onClose={() => setSelectedQuote(null)}
           onDelete={canDelete && selectedQuote.id && !String(selectedQuote.id).startsWith('compiled-') ? () => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no) : null}
           theme={theme}

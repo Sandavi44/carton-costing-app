@@ -329,6 +329,7 @@ function App() {
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8">
         {activeTab === 'calculator' && (
           <CostingApp 
+            user={user}
             formData={formData} 
             setFormData={setFormData} 
             calculatedCost={calculatedCost} 

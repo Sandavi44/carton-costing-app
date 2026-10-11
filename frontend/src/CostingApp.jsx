@@ -426,7 +426,7 @@ export const getProposedCosts = (carton, category, isTwoUp = false, rates = {}) 
 // MAIN COSTINGAPP COMPONENT
 // ============================================================================
 
-export default function CostingApp({ formData, setFormData, calculatedCost, setCalculatedCost, theme }) {
+export default function CostingApp({ user, formData, setFormData, calculatedCost, setCalculatedCost, theme }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [nextQuoteNo, setNextQuoteNo] = useState('');
@@ -1234,9 +1234,11 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       die_making_cost: parseFloat(formData.oneTimeDieCost || 0),
       block_making_cost: parseFloat(formData.oneTimeBlockCost || 0),
       one_time_transport_cost: parseFloat(formData.oneTimeTransportCost || 0),
-      payment_method: formData.paymentMethod || 'Credit - 30 Days'
+      payment_method: formData.paymentMethod || 'Credit - 30 Days',
+      originator_name: user?.username || 'Admin',
+      prepared_by: user?.username || 'Admin'
     };
-  }, [quotationItems, nextQuoteNo, formData]);
+  }, [quotationItems, nextQuoteNo, formData, user]);
 
   return (
     <div className={`rounded-3xl shadow-2xl p-8 transition-colors duration-300 text-left border ${
@@ -2443,6 +2445,7 @@ export default function CostingApp({ formData, setFormData, calculatedCost, setC
       {showQuotationModal && compiledQuoteForPreview && (
         <OfficialQuotationModal
           quote={compiledQuoteForPreview}
+          user={user}
           onClose={() => setShowQuotationModal(false)}
           theme={theme}
         />
