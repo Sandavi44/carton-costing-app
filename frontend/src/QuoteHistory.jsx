@@ -117,10 +117,38 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
 
     const compiledItems = [];
     selectedList.forEach(q => {
-      if (q.items && Array.isArray(q.items) && q.items.length > 0) {
-        compiledItems.push(...q.items);
+      const qPrice = parseFloat(q.final_cost_per_carton || q.finalCostPerCarton || 0);
+      const qTotal = parseFloat(q.total_cost_batch || q.totalCostBatch || 0);
+      const qQty = parseInt(q.quantity || 0, 10);
+
+      if (q.items && Array.isArray(q.items) && q.items.length > 1) {
+        q.items.forEach(it => {
+          const itPrice = parseFloat(it.final_cost_per_carton || it.finalCostPerCarton || it.calculated_cost?.final?.final_cost_per_carton || qPrice || 0);
+          const itQty = parseInt(it.quantity || 0, 10);
+          const itTotal = parseFloat(it.total_cost_batch || it.totalCostBatch || it.calculated_cost?.final?.total_cost_batch || (itPrice * itQty) || 0);
+          compiledItems.push({
+            ...it,
+            final_cost_per_carton: itPrice,
+            finalCostPerCarton: itPrice,
+            quantity: itQty,
+            total_cost_batch: itTotal,
+            totalCostBatch: itTotal,
+            carton_type: it.carton_type || it.cartonType || q.carton_type || 'RSC',
+            ply_type: it.ply_type || it.plyType || q.ply_type || '3-Ply',
+            flute_type: it.flute_type || it.fluteType || q.flute_type || 'B-Flute',
+            board_type: it.board_type || it.boardType || q.board_type || 'Brown Liner',
+            is_printed: it.is_printed !== undefined ? it.is_printed : (it.isPrinted !== undefined ? it.isPrinted : q.is_printed),
+            print_name: it.print_name || it.printName || q.print_name || ''
+          });
+        });
       } else {
-        compiledItems.push(q);
+        compiledItems.push({
+          ...q,
+          final_cost_per_carton: qPrice,
+          finalCostPerCarton: qPrice,
+          quantity: qQty,
+          total_cost_batch: qTotal
+        });
       }
     });
 
@@ -128,7 +156,8 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
     const totalBatchSum = compiledItems.reduce((acc, it) => {
       const q = parseInt(it.quantity || 0, 10);
       const p = Math.round(parseFloat(it.final_cost_per_carton || it.finalCostPerCarton || 0) * 4) / 4;
-      return acc + (p * q);
+      const amt = (p * q) > 0 ? (p * q) : parseFloat(it.total_cost_batch || it.totalCostBatch || 0);
+      return acc + amt;
     }, 0);
 
     const compiledQuote = {

@@ -664,7 +664,12 @@ def save_quote():
             block_making_cost=safe_float(data.get('oneTimeBlockCost') or data.get('block_making_cost') or 0),
             one_time_transport_cost=safe_float(data.get('oneTimeTransportCost') or data.get('one_time_transport_cost') or 0),
             payment_method=data.get('paymentMethod') or data.get('payment_method') or "Credit - 30 Days",
-            items=json.dumps(raw_items) if is_multi_item else json.dumps([data])
+            items=json.dumps(raw_items) if is_multi_item else json.dumps([
+                dict(data, 
+                     final_cost_per_carton=(data.get('calculated_cost', {}).get('final', {}).get('final_cost_per_carton') or data.get('final_cost_per_carton')),
+                     total_cost_batch=(data.get('calculated_cost', {}).get('final', {}).get('total_cost_batch') or data.get('total_cost_batch')),
+                     quantity=overall_quantity)
+            ])
         )
         
         # Add calculated costs
@@ -734,6 +739,19 @@ def get_quote_history():
             if getattr(quote, 'items', None):
                 try:
                     items_list = json.loads(quote.items) if isinstance(quote.items, str) else quote.items
+                    if isinstance(items_list, list):
+                        for it in items_list:
+                            if isinstance(it, dict):
+                                if not it.get('final_cost_per_carton') and not it.get('finalCostPerCarton'):
+                                    calc = it.get('calculated_cost', {})
+                                    if isinstance(calc, dict):
+                                        it['final_cost_per_carton'] = calc.get('final', {}).get('final_cost_per_carton') or quote.final_cost_per_carton
+                                        it['total_cost_batch'] = calc.get('final', {}).get('total_cost_batch') or quote.total_cost_batch
+                                    else:
+                                        it['final_cost_per_carton'] = quote.final_cost_per_carton
+                                        it['total_cost_batch'] = quote.total_cost_batch
+                                if not it.get('quantity'):
+                                    it['quantity'] = quote.quantity
                 except Exception:
                     items_list = []
 
@@ -814,6 +832,19 @@ def get_quote(quote_id):
         if getattr(quote, 'items', None):
             try:
                 items_list = json.loads(quote.items) if isinstance(quote.items, str) else quote.items
+                if isinstance(items_list, list):
+                    for it in items_list:
+                        if isinstance(it, dict):
+                            if not it.get('final_cost_per_carton') and not it.get('finalCostPerCarton'):
+                                calc = it.get('calculated_cost', {})
+                                if isinstance(calc, dict):
+                                    it['final_cost_per_carton'] = calc.get('final', {}).get('final_cost_per_carton') or quote.final_cost_per_carton
+                                    it['total_cost_batch'] = calc.get('final', {}).get('total_cost_batch') or quote.total_cost_batch
+                                else:
+                                    it['final_cost_per_carton'] = quote.final_cost_per_carton
+                                    it['total_cost_batch'] = quote.total_cost_batch
+                            if not it.get('quantity'):
+                                it['quantity'] = quote.quantity
             except Exception:
                 items_list = []
 

@@ -139,10 +139,33 @@ export default function OfficialQuotationModal({ quote, user, onClose, onDelete,
     };
     const boardDisplay = formatBoardName(item.board_type || item.boardType);
 
-    const rawUnitPrice = parseFloat(item.final_cost_per_carton || item.finalCostPerCarton || 0);
+    const rawUnitPrice = parseFloat(
+      item.final_cost_per_carton ||
+      item.finalCostPerCarton ||
+      item.calculated_cost?.final?.final_cost_per_carton ||
+      item.calculated_cost?.final_cost_per_carton ||
+      item.calculatedCost?.final?.final_cost_per_carton ||
+      (quote.items && quote.items.length === 1 ? quote.final_cost_per_carton : 0) ||
+      quote.final_cost_per_carton ||
+      quote.finalCostPerCarton ||
+      0
+    );
+    const qty = parseInt(item.quantity || quote.quantity || 0, 10);
     const unitPrice = Math.round(rawUnitPrice * 4) / 4;
-    const qty = parseInt(item.quantity || 0, 10);
-    const cartonAmount = unitPrice * qty;
+    const rawTotalBatch = parseFloat(
+      item.total_cost_batch ||
+      item.totalCostBatch ||
+      item.calculated_cost?.final?.total_cost_batch ||
+      item.calculated_cost?.total_cost_batch ||
+      (quote.items && quote.items.length === 1 ? quote.total_cost_batch : 0) ||
+      0
+    );
+    const cartonAmount = (unitPrice > 0 && qty > 0)
+      ? (unitPrice * qty)
+      : (rawTotalBatch > 0 ? rawTotalBatch : 0);
+    const effectiveUnitPrice = unitPrice > 0
+      ? unitPrice
+      : (qty > 0 && cartonAmount > 0 ? (Math.round((cartonAmount / qty) * 4) / 4) : 0);
 
     const printName = (item.print_name || item.printName || quote.print_name || quote.printName || '').trim();
     const printTypeDisplay = isPrinted ? (printName || 'Printed') : 'Plain';
@@ -154,7 +177,7 @@ export default function OfficialQuotationModal({ quote, user, onClose, onDelete,
       fluteDisplay,
       boardDisplay,
       qty,
-      unitPrice,
+      unitPrice: effectiveUnitPrice,
       cartonAmount
     };
   };
@@ -168,7 +191,9 @@ export default function OfficialQuotationModal({ quote, user, onClose, onDelete,
   const totalCartonsAmount = parsedItems.reduce((acc, it) => acc + it.cartonAmount, 0);
 
   // Subtotal is sum of all carton line amounts + any one-time charges
-  const subtotalAmount = totalCartonsAmount + dieCost + blockCost + oneTimeTransport;
+  const subtotalAmount = totalCartonsAmount > 0
+    ? (totalCartonsAmount + dieCost + blockCost + oneTimeTransport)
+    : (parseFloat(quote.total_cost_batch || 0) || (dieCost + blockCost + oneTimeTransport));
   const vatAmount = subtotalAmount * 0.18;
   const totalAmount = isVatCustomer ? (subtotalAmount + vatAmount) : subtotalAmount;
 

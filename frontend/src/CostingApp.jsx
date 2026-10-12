@@ -1012,6 +1012,8 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         one_time_transport_cost: parseFloat(formData.oneTimeTransportCost || 0),
         paymentMethod: formData.paymentMethod || 'Credit - 30 Days',
         payment_method: formData.paymentMethod || 'Credit - 30 Days',
+        final_cost_per_carton: finalCostPerCarton,
+        total_cost_batch: totalBatchCost,
         gsm_values: gsmArray, 
         calculated_cost: payloadCalculatedCost 
       }, {
