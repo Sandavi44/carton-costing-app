@@ -724,16 +724,45 @@ def get_quote_history():
         result = []
         for quote in quotes:
             dim_unit = getattr(quote, 'dimension_unit', 'mm') or 'mm'
+            carton_type = getattr(quote, 'carton_type', 'RSC') or 'RSC'
+            is_sf = carton_type == 'S.F.'
             l_in = getattr(quote, 'carton_length_input', None)
             w_in = getattr(quote, 'carton_width_input', None)
             h_in = getattr(quote, 'carton_height_input', None)
+            die_l_in = getattr(quote, 'die_length_input', None)
+            die_w_in = getattr(quote, 'die_width_input', None)
             c_l = round(quote.carton_length_mm) if quote.carton_length_mm else 0
             c_w = round(quote.carton_width_mm) if quote.carton_width_mm else 0
             c_h = round(quote.carton_height_mm) if quote.carton_height_mm else 0
-            if dim_unit == 'inches' and l_in and w_in and h_in:
-                dim_display = f"{l_in}×{w_in}×{h_in} inches"
+            die_l = round(quote.die_length_mm) if getattr(quote, 'die_length_mm', None) else 0
+            die_w = round(quote.die_width_mm) if getattr(quote, 'die_width_mm', None) else 0
+            ply_type = quote.ply_type or '3-Ply'
+            ply_clean = ply_type.replace('-', ' ')
+            is_printed = bool(quote.is_printed)
+
+            if is_sf:
+                if dim_unit == 'inches':
+                    if die_l_in and die_w_in:
+                        dim_display = f"{die_l_in}×{die_w_in} inches"
+                    elif die_l > 0 and die_w > 0:
+                        dim_display = f"{(die_l / 25.4):.2f}".rstrip('0').rstrip('.') + f"×{(die_w / 25.4):.2f}".rstrip('0').rstrip('.') + " inches"
+                    else:
+                        dim_display = f"{die_l}×{die_w} mm"
+                else:
+                    dim_display = f"{die_l}×{die_w} mm"
+                is_sheet = ply_type in ['2-Ply', '4-Ply']
+                product_noun = ('Printed Sheet' if is_printed else 'Sheet') if is_sheet else ('Printed Boards' if is_printed else 'Boards')
+                main_desc = f"{dim_display} - {ply_clean} {product_noun} - S.F."
             else:
-                dim_display = f"{c_l}×{c_w}×{c_h} mm"
+                if dim_unit == 'inches' and l_in and w_in and h_in:
+                    dim_display = f"{l_in}×{w_in}×{h_in} inches"
+                elif dim_unit == 'inches' and (c_l > 0 or c_w > 0 or c_h > 0):
+                    dim_display = f"{(c_l / 25.4):.2f}".rstrip('0').rstrip('.') + f"×{(c_w / 25.4):.2f}".rstrip('0').rstrip('.') + f"×{(c_h / 25.4):.2f}".rstrip('0').rstrip('.') + " inches"
+                else:
+                    dim_display = f"{c_l}×{c_w}×{c_h} mm"
+                product_noun = 'Printed Carton' if is_printed else 'Carton'
+                type_str = carton_type if 'type' in carton_type.lower() else f"{carton_type} Type"
+                main_desc = f"{dim_display} - {ply_clean} {product_noun} - {type_str}"
 
             items_list = []
             if getattr(quote, 'items', None):
@@ -764,6 +793,8 @@ def get_quote_history():
                 'prepared_by': orig_name,
                 'created_by': orig_name,
                 'dimensions': dim_display,
+                'description': main_desc,
+                'item_description': main_desc,
                 'dimension_unit': dim_unit,
                 'carton_length_input': l_in,
                 'carton_width_input': w_in,
@@ -856,6 +887,47 @@ def get_quote(quote_id):
             pass
         originator_name = quote_user.username if quote_user else 'Admin'
 
+        carton_type = getattr(quote, 'carton_type', 'RSC') or 'RSC'
+        is_sf = carton_type == 'S.F.'
+        dim_unit = getattr(quote, 'dimension_unit', 'mm') or 'mm'
+        l_in = getattr(quote, 'carton_length_input', None)
+        w_in = getattr(quote, 'carton_width_input', None)
+        h_in = getattr(quote, 'carton_height_input', None)
+        die_l_in = getattr(quote, 'die_length_input', None)
+        die_w_in = getattr(quote, 'die_width_input', None)
+        c_l = round(quote.carton_length_mm) if quote.carton_length_mm else 0
+        c_w = round(quote.carton_width_mm) if quote.carton_width_mm else 0
+        c_h = round(quote.carton_height_mm) if quote.carton_height_mm else 0
+        die_l = round(quote.die_length_mm) if getattr(quote, 'die_length_mm', None) else 0
+        die_w = round(quote.die_width_mm) if getattr(quote, 'die_width_mm', None) else 0
+        ply_type = quote.ply_type or '3-Ply'
+        ply_clean = ply_type.replace('-', ' ')
+        is_printed = bool(quote.is_printed)
+
+        if is_sf:
+            if dim_unit == 'inches':
+                if die_l_in and die_w_in:
+                    dim_display = f"{die_l_in}×{die_w_in} inches"
+                elif die_l > 0 and die_w > 0:
+                    dim_display = f"{(die_l / 25.4):.2f}".rstrip('0').rstrip('.') + f"×{(die_w / 25.4):.2f}".rstrip('0').rstrip('.') + " inches"
+                else:
+                    dim_display = f"{die_l}×{die_w} mm"
+            else:
+                dim_display = f"{die_l}×{die_w} mm"
+            is_sheet = ply_type in ['2-Ply', '4-Ply']
+            product_noun = ('Printed Sheet' if is_printed else 'Sheet') if is_sheet else ('Printed Boards' if is_printed else 'Boards')
+            main_desc = f"{dim_display} - {ply_clean} {product_noun} - S.F."
+        else:
+            if dim_unit == 'inches' and l_in and w_in and h_in:
+                dim_display = f"{l_in}×{w_in}×{h_in} inches"
+            elif dim_unit == 'inches' and (c_l > 0 or c_w > 0 or c_h > 0):
+                dim_display = f"{(c_l / 25.4):.2f}".rstrip('0').rstrip('.') + f"×{(c_w / 25.4):.2f}".rstrip('0').rstrip('.') + f"×{(c_h / 25.4):.2f}".rstrip('0').rstrip('.') + " inches"
+            else:
+                dim_display = f"{c_l}×{c_w}×{c_h} mm"
+            product_noun = 'Printed Carton' if is_printed else 'Carton'
+            type_str = carton_type if 'type' in carton_type.lower() else f"{carton_type} Type"
+            main_desc = f"{dim_display} - {ply_clean} {product_noun} - {type_str}"
+
         return jsonify({
             'id': quote.id,
             'quote_no': f"QT-{str(quote.id).zfill(5)}",
@@ -863,6 +935,9 @@ def get_quote(quote_id):
             'originator_name': originator_name,
             'prepared_by': originator_name,
             'created_by': originator_name,
+            'description': main_desc,
+            'item_description': main_desc,
+            'dimensions_display': dim_display,
             'created_at': quote.created_at.strftime('%d/%m/%Y') if quote.created_at else datetime.utcnow().strftime('%d/%m/%Y'),
             'dimension_unit': getattr(quote, 'dimension_unit', 'mm') or 'mm',
             'carton_length_input': getattr(quote, 'carton_length_input', None),

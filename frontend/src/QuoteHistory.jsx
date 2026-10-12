@@ -312,16 +312,66 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
     }
   };
 
-  // Perform search filtering on full quote database client-side (checks Name, QT- Order No, Originator, Type, Print)
+  // Format item description matching official quotation document view
+  const getItemMainDescription = (q) => {
+    if (q.item_count > 1) return null;
+    if (q.description && typeof q.description === 'string' && !q.description.includes('[object Object]')) {
+      return q.description;
+    }
+    if (q.item_description && typeof q.item_description === 'string' && !q.item_description.includes('[object Object]')) {
+      return q.item_description;
+    }
+
+    const cartonType = q.carton_type || 'RSC';
+    const isSF = cartonType === 'S.F.' || cartonType.includes('S.F.');
+    const plyType = q.ply_type || '3-Ply';
+    const plyClean = plyType.replace('-', ' ');
+    const isPrinted = Boolean(q.is_printed);
+    const dimUnit = q.dimension_unit || 'mm';
+
+    let dimStr = q.dimensions;
+    if (!dimStr || dimStr.startsWith('0×0×0') || (isSF && dimStr.endsWith('0×0×0 mm'))) {
+      if (isSF) {
+        if (dimUnit === 'inches') {
+          const lIn = q.die_length_input || (q.die_length_mm ? (q.die_length_mm / 25.4).toFixed(2).replace(/\.00$/, '') : '0');
+          const wIn = q.die_width_input || (q.die_width_mm ? (q.die_width_mm / 25.4).toFixed(2).replace(/\.00$/, '') : '0');
+          dimStr = `${lIn}×${wIn} inches`;
+        } else {
+          const lMm = Math.round(q.die_length_mm || 0);
+          const wMm = Math.round(q.die_width_mm || 0);
+          dimStr = `${lMm}×${wMm} mm`;
+        }
+      } else {
+        if (dimUnit === 'inches' && q.carton_length_input && q.carton_width_input && q.carton_height_input) {
+          dimStr = `${q.carton_length_input}×${q.carton_width_input}×${q.carton_height_input} inches`;
+        } else {
+          dimStr = `${Math.round(q.carton_length_mm || 0)}×${Math.round(q.carton_width_mm || 0)}×${Math.round(q.carton_height_mm || 0)} mm`;
+        }
+      }
+    }
+
+    if (isSF) {
+      const isSheet = plyType === '2-Ply' || plyType === '4-Ply';
+      const productNoun = isSheet ? (isPrinted ? 'Printed Sheet' : 'Sheet') : (isPrinted ? 'Printed Boards' : 'Boards');
+      return `${dimStr} - ${plyClean} ${productNoun} - S.F.`;
+    }
+    const productNoun = isPrinted ? 'Printed Carton' : 'Carton';
+    const typeStr = cartonType.toLowerCase().includes('type') ? cartonType : `${cartonType} Type`;
+    return `${dimStr} - ${plyClean} ${productNoun} - ${typeStr}`;
+  };
+
+  // Perform search filtering on full quote database client-side (checks Name, QT- Order No, Originator, Type, Print, Description)
   const filteredQuotes = quotes.filter((quote) => {
     if (customerFilter) {
       const q = customerFilter.toLowerCase();
+      const itemDesc = (getItemMainDescription(quote) || '').toLowerCase();
       const matchesName = (quote.customer_name || '').toLowerCase().includes(q);
       const matchesNo = (quote.quote_no || '').toLowerCase().includes(q);
       const matchesOriginator = (quote.originator_name || quote.prepared_by || '').toLowerCase().includes(q);
       const matchesType = (quote.carton_type || '').toLowerCase().includes(q);
       const matchesPrint = (quote.is_printed ? ('printed ' + (quote.print_name || '')) : 'plain').toLowerCase().includes(q);
-      if (!matchesName && !matchesNo && !matchesOriginator && !matchesType && !matchesPrint) {
+      const matchesDesc = itemDesc.includes(q);
+      if (!matchesName && !matchesNo && !matchesOriginator && !matchesType && !matchesPrint && !matchesDesc) {
         return false;
       }
     }
@@ -332,14 +382,23 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
       }
     }
     if (lengthFilter || widthFilter || heightFilter) {
-      const parts = quote.dimensions.split('×');
-      if (parts.length === 3) {
-        const [l, w, h] = parts;
+      const isSF = (quote.carton_type || '').includes('S.F.');
+      if (isSF) {
+        if (heightFilter) return false;
+        const l = Math.round(quote.die_length_mm || 0).toString();
+        const w = Math.round(quote.die_width_mm || 0).toString();
         if (lengthFilter && l !== lengthFilter) return false;
         if (widthFilter && w !== widthFilter) return false;
-        if (heightFilter && h !== heightFilter) return false;
       } else {
-        return false;
+        const parts = (quote.dimensions || '').split('×');
+        if (parts.length === 3) {
+          const [l, w, h] = parts.map(p => p.trim().split(' ')[0]);
+          if (lengthFilter && l !== lengthFilter) return false;
+          if (widthFilter && w !== widthFilter) return false;
+          if (heightFilter && h !== heightFilter) return false;
+        } else {
+          return false;
+        }
       }
     }
     return true;
@@ -417,7 +476,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5">
           <input
             type="text"
-            placeholder="Search Name, Order No., Originator, Type..."
+            placeholder="Search Name, Order No., Originator, Description, Type..."
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
             className={inputClass}
@@ -582,7 +641,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                     Product Details
                   </th>
                   <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-                    Dimensions / Items
+                    Item Description
                   </th>
                   <th className={`px-5 py-3 text-left text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#c5a880]' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
                     Ply / Qty
@@ -687,8 +746,8 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                       )}
                     </td>
 
-                    <td className={`px-5 py-4 whitespace-nowrap font-mono text-sm ${
-                      isDark ? 'text-slate-300' : isSand ? 'text-[#6b5940]' : 'text-gray-700'
+                    <td className={`px-5 py-4 whitespace-nowrap text-sm font-medium ${
+                      isDark ? 'text-slate-200' : isSand ? 'text-[#5c4c36]' : 'text-gray-800'
                     }`}>
                       {quote.item_count > 1 ? (
                         <div>
@@ -696,7 +755,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                           <div className="text-[11px] opacity-75 font-sans">Compiled Quote</div>
                         </div>
                       ) : (
-                        quote.dimensions
+                        <span>{getItemMainDescription(quote)}</span>
                       )}
                     </td>
                     <td className={`px-5 py-4 whitespace-nowrap ${
