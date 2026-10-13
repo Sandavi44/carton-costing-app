@@ -301,6 +301,7 @@ def ensure_db_columns_exist():
             default_params = [
                 ('inhouse_waste_percent', '5', 'Inhouse Waste allowance %'),
                 ('outsource_waste_percent', '3', 'Outsource Waste allowance %'),
+                ('outsource_sf_waste_percent', '1', 'Outsource SF Waste allowance %'),
                 ('white_liner_board_rate', '285', 'White Liner Board Rate (Rs./kg)'),
                 ('brown_liner_board_rate', '260', 'Brown Liner Board Rate (Rs./kg)'),
                 ('joining_cost_glued_s', '3.00', 'Auto Joining Cost - Glued Type S (Rs.)'),
@@ -483,9 +484,12 @@ def calculate_cost():
         
         outsource_waste_param = SystemParameter.query.filter_by(parameter_name='outsource_waste_percent').first()
         outsource_waste_rate = safe_float(outsource_waste_param.value) if outsource_waste_param else 3.0
+
+        outsource_sf_waste_param = SystemParameter.query.filter_by(parameter_name='outsource_sf_waste_percent').first()
+        outsource_sf_waste_rate = safe_float(outsource_sf_waste_param.value) if outsource_sf_waste_param else 1.0
         
         prod_method = data.get('production_method') or data.get('productionMethod', 'In-house')
-        is_outsource = prod_method == 'Outsource'
+        is_outsource = prod_method in ['Outsource', 'Outsource SF']
 
         white_liner_param = SystemParameter.query.filter_by(parameter_name='white_liner_board_rate').first()
         default_white_liner = safe_float(white_liner_param.value) if white_liner_param else 285.0
@@ -528,6 +532,7 @@ def calculate_cost():
             die_width_mm=round(safe_float(data.get('die_width_mm') or data.get('dieWidth', 0))),
             inhouse_waste_percent=inhouse_waste_rate,
             outsource_waste_percent=outsource_waste_rate,
+            outsource_sf_waste_percent=outsource_sf_waste_rate,
             joining_type=data.get('joining_type'),
             is_printed=data.get('is_printed', False),
             white_liner_rate=req_white,
@@ -590,7 +595,7 @@ def save_quote():
         
         # Determine production method
         production_method = first_item.get('productionMethod') or first_item.get('production_method') or data.get('productionMethod') or data.get('production_method', 'In-house')
-        is_outsource = production_method == 'Outsource'
+        is_outsource = production_method in ['Outsource', 'Outsource SF']
 
         # Calculate overhead per carton (0 if Outsource)
         total_overhead = 0.0 if is_outsource else safe_float(data.get('totalOverheadForOrder', 0))
@@ -1285,6 +1290,7 @@ def init_db():
             ('waste_allowance_percent', '5', 'Inhouse Waste allowance %'),
             ('inhouse_waste_percent', '5', 'Inhouse Waste allowance %'),
             ('outsource_waste_percent', '3', 'Outsource Waste allowance %'),
+            ('outsource_sf_waste_percent', '1', 'Outsource SF Waste allowance %'),
             ('white_liner_board_rate', '285', 'White Liner Board Rate (Rs./kg)'),
             ('brown_liner_board_rate', '260', 'Brown Liner Board Rate (Rs./kg)'),
             ('joining_cost_glued_s', '3.00', 'Auto Joining Cost - Glued Type S (Rs.)'),

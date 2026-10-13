@@ -314,7 +314,7 @@ export const calculateBoardAreaAndCategory = (carton) => {
   const H = parseFloat(carton.cartonHeight) || 0;
   const ply = carton.plyType || '3-Ply';
   const prodMethod = carton.productionMethod || 'In-house';
-  const isOutsource = prodMethod === 'Outsource' || (carton.taxType && carton.taxType.includes('Outsource'));
+  const isOutsource = prodMethod === 'Outsource' || prodMethod === 'Outsource SF' || (carton.taxType && carton.taxType.includes('Outsource'));
 
   let sheetLength = 0;
   let sheetWidth = 0;
@@ -569,7 +569,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         updated.gsm5 = '140';
         changed = true;
       }
-      if (updated.productionMethod !== 'Outsource' && !updated.totalOverheadForOrder) {
+      if (updated.productionMethod !== 'Outsource' && updated.productionMethod !== 'Outsource SF' && !updated.totalOverheadForOrder) {
         updated.totalOverheadForOrder = '1000';
         changed = true;
       }
@@ -789,7 +789,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         }
       }
       if (name === 'productionMethod') {
-        if (value === 'Outsource') {
+        if (value === 'Outsource' || value === 'Outsource SF') {
           setError('');
         } else if (value === 'In-house' && (!updated.totalOverheadForOrder || updated.totalOverheadForOrder === '0')) {
           updated.totalOverheadForOrder = '1000';
@@ -875,7 +875,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         return;
       }
 
-      const isOutsource = formData.productionMethod === 'Outsource';
+      const isOutsource = formData.productionMethod === 'Outsource' || formData.productionMethod === 'Outsource SF';
 
       if (!isOutsource && !formData.totalOverheadForOrder) {
         setError('Please enter total overhead (for entire order)');
@@ -982,7 +982,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
       const mmHeight = toMM(formData.cartonHeight);
       const mmDieLength = toMM(formData.dieLength);
       const mmDieWidth = toMM(formData.dieWidth);
-      const isOutsource = formData.productionMethod === 'Outsource';
+      const isOutsource = formData.productionMethod === 'Outsource' || formData.productionMethod === 'Outsource SF';
       const response = await axios.post('/api/quotes/save', { 
         ...formData, 
         cartonLength: mmLength,
@@ -1696,11 +1696,12 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
             <select name="productionMethod" value={formData.productionMethod || 'In-house'} onChange={handleInputChange} className={selectClass}>
               <option value="In-house">In-house</option>
               <option value="Outsource">Outsource</option>
+              <option value="Outsource SF">Outsource SF</option>
             </select>
           </div>
           <div className={`flex items-center text-sm px-4 py-3 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700 text-slate-300' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-            {formData.productionMethod === 'Outsource'
-              ? '⚠️ Outsource: Overhead, joining, printing, slotting, bundling and die-cutting costs are excluded from calculation.'
+            {(formData.productionMethod === 'Outsource' || formData.productionMethod === 'Outsource SF')
+              ? `⚠️ ${formData.productionMethod}: Overhead, joining, printing, slotting, bundling and die-cutting costs are excluded from calculation.`
               : '🏭 In-house: All process costs (overhead, joining, printing, slotting, bundling, die-cutting) apply.'}
           </div>
         </div>
@@ -1736,11 +1737,11 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
       <div className={`${cardClass} mb-6`}>
         <h3 className={headingClass}>💵 Costs</h3>
         
-        {formData.productionMethod === 'Outsource' ? (
+        {(formData.productionMethod === 'Outsource' || formData.productionMethod === 'Outsource SF') ? (
           <div className={`flex items-center gap-3 px-4 py-5 rounded-xl border ${isDark ? 'bg-slate-800/40 border-slate-700 text-slate-400' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
             <span className="text-2xl">⚠️</span>
             <div>
-              <p className="font-semibold text-sm">Outsource mode – All process costs excluded</p>
+              <p className="font-semibold text-sm">{formData.productionMethod} mode – All process costs excluded</p>
               <p className="text-xs mt-0.5 opacity-80">Overhead, joining, printing, slotting, bundling and die-cutting are not included in the costing for outsourced production. Only raw material cost applies.</p>
             </div>
           </div>

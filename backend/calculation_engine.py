@@ -156,9 +156,10 @@ class CostingParameters:
     die_length_mm: float = 0.0
     die_width_mm: float = 0.0
     
-    # Waste allowances from system parameters (defaults: In-house 5%, Outsource 3%)
+    # Waste allowances from system parameters (defaults: In-house 5%, Outsource 3%, Outsource SF 1%)
     inhouse_waste_percent: float = 5.0
     outsource_waste_percent: float = 3.0
+    outsource_sf_waste_percent: float = 1.0
     
     # Profit and tax
     profit_margin_percent: float = 15.0
@@ -213,7 +214,9 @@ class CostingCalculator:
         
         # Determine waste allowance percent based on production method
         prod_method = getattr(self.params, 'production_method', 'In-house')
-        if prod_method == "Outsource" or "Outsource" in getattr(self.params, 'tax_type', ''):
+        if prod_method == "Outsource SF":
+            waste_allowance_percent = getattr(self.params, 'outsource_sf_waste_percent', 1.0)
+        elif prod_method == "Outsource" or "Outsource" in getattr(self.params, 'tax_type', ''):
             waste_allowance_percent = getattr(self.params, 'outsource_waste_percent', 3.0)
         else:
             waste_allowance_percent = getattr(self.params, 'inhouse_waste_percent', 5.0)
@@ -482,7 +485,7 @@ class CostingCalculator:
         
         prod_method = getattr(self.params, 'production_method', 'In-house')
         tax_type = getattr(self.params, 'tax_type', '')
-        is_outsource = prod_method == "Outsource" or "Outsource" in tax_type
+        is_outsource = prod_method in ["Outsource", "Outsource SF"] or "Outsource" in tax_type
         available_reels = REEL_WIDTHS if is_outsource else [r for r in REEL_WIDTHS if r <= 1600]
         
         for reel_width in available_reels:

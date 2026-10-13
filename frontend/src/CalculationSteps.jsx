@@ -89,7 +89,9 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
   const wastePerReel = calculatedCost.reel_information?.waste_per_reel_mm ?? calculatedCost.sheet_dimensions.reel_waste_mm;
   const boardArea = calculatedCost.sheet_dimensions.board_area_m2;
   const totalGsm = calculatedCost.material.total_gsm;
-  const wastePercent = calculatedCost.material.waste_allowance_percent ?? (formData.productionMethod === 'Outsource' ? 3.0 : 5.0);
+  const wastePercent = calculatedCost.material.waste_allowance_percent ?? (
+    formData.productionMethod === 'Outsource SF' ? 1.0 : (formData.productionMethod === 'Outsource' ? 3.0 : 5.0)
+  );
   const weightPerSheet = calculatedCost.material.weight_per_sheet_kg;
   const rate = calculatedCost.rates.rate_per_kg;
   const rmCostBeforeSscl = calculatedCost.rates.rm_cost_before_sscl ?? (weightPerSheet * rate);
@@ -270,7 +272,7 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
             <div>
               <p className="text-sm font-semibold">1. Sheet Slicing Sourcing Area</p>
               <div className={solveBoxClass}>
-                <p className="opacity-70">Equation: Area = Sheet Length * Selected Reel Width / Slices {formData.productionMethod !== 'Outsource' ? '(In-House: Max Reel 1600 mm)' : '(Outsource: Max Reel 1850 mm)'}</p>
+                <p className="opacity-70">Equation: Area = Sheet Length * Selected Reel Width / Slices {(formData.productionMethod === 'Outsource' || formData.productionMethod === 'Outsource SF') ? '(Outsource: Max Reel 1850 mm)' : '(In-House: Max Reel 1600 mm)'}</p>
                 <p className="text-blue-500 font-bold mt-1">
                   Solve: ({sheetLength} * {selectedReel}) / {sheetsPerReel} = {(sheetLength * selectedReel / sheetsPerReel).toFixed(2)} mm²
                 </p>
@@ -303,12 +305,14 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
                 <p className="opacity-70">
                   {ply === '2-Ply' && `Equation: Total GSM = Liner 1 (Outer 1) + Flute 1 * Flute Factor (${wf1})`}
                   {ply === '3-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Factor (${wf1}) + Liner 2 (Outer Liner)`}
+                  {ply === '4-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Type 1 Factor (${wf1}) + Liner 2 + Flute 2 * Flute Type 2 Factor (${wf2})`}
                   {ply === '5-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Type 1 Factor (${wf1}) + Liner 2 (Middle) + Flute 2 * Flute Type 2 Factor (${wf2}) + Liner 3 (Outer Liner)`}
                   {ply === '7-Ply' && `Equation: Total GSM = Liner 1 + Flute 1 * Flute Type 1 Factor (${wf1}) + Liner 2 + Flute 2 * Flute Type 2 Factor (${wf2}) + Liner 3 + Flute 3 * Flute Type 1 Factor (${wf1}) + Liner 4`}
                 </p>
                 <p className="text-blue-500 font-bold mt-1">
                   {ply === '2-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) = ${g1} + ${(g2 * wf1).toFixed(2)} = ${totalGsm.toFixed(2)} gsm`}
                   {ply === '3-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) + ${g3} = ${g1} + ${(g2 * wf1).toFixed(2)} + ${g3} = ${totalGsm.toFixed(2)} gsm`}
+                  {ply === '4-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) + ${g3} + (${g4} * ${wf2}) = ${g1} + ${(g2 * wf1).toFixed(2)} + ${g3} + ${(g4 * wf2).toFixed(2)} = ${totalGsm.toFixed(2)} gsm`}
                   {ply === '5-Ply' && `Solve: ${g1} + (${g2} * ${wf1}) + ${g3} + (${g4} * ${wf2}) + ${g5} = ${g1} + ${(g2 * wf1).toFixed(2)} + ${g3} + ${(g4 * wf2).toFixed(2)} + ${g5} = ${totalGsm.toFixed(2)} gsm`}
                   {ply === '7-Ply' && `Solve: Total GSM = ${totalGsm.toFixed(2)} gsm`}
                 </p>

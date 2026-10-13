@@ -280,7 +280,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
         white_liner_rate: parseFloat(newFormData.whiteLinerRate || 0),
         brown_liner_rate: parseFloat(newFormData.brownLinerRate || 0),
         total_overhead_for_order: parseFloat(newFormData.totalOverheadForOrder || 0),
-        joining_cost: (newFormData.productionMethod === 'Outsource' || newFormData.cartonType === 'S.F.') ? 0 : parseFloat(newFormData.joiningCost || 0),
+        joining_cost: (newFormData.productionMethod === 'Outsource' || newFormData.productionMethod === 'Outsource SF' || newFormData.cartonType === 'S.F.') ? 0 : parseFloat(newFormData.joiningCost || 0),
         print_cost: newFormData.isPrinted ? parseFloat(newFormData.printCost || 0) : 0,
         slotting_cost: parseFloat(newFormData.slottingCost || 0),
         bundling_cost: parseFloat(newFormData.bundlingCost || 0),

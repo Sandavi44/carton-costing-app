@@ -77,6 +77,8 @@ export default function SystemParameters({ theme }) {
         return { label: 'In-House Waste Allowance', unit: '%' };
       case 'outsource_waste_percent':
         return { label: 'Outsource Waste Allowance', unit: '%' };
+      case 'outsource_sf_waste_percent':
+        return { label: 'Outsource SF Waste Allowance', unit: '%' };
       case 'waste_allowance_percent':
         return { label: 'Default Waste Allowance', unit: '%' };
       default:
