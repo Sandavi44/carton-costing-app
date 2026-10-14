@@ -1544,11 +1544,14 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
                 type="button"
                 disabled={saveMultiLoading}
                 onClick={handleSaveMultiItemQuote}
+                style={{
+                  backgroundColor: '#047857',
+                  color: '#ffffff',
+                  border: '1.5px solid #065f46'
+                }}
                 className={`font-black px-4 py-2 rounded-xl text-xs sm:text-sm shadow-md transition cursor-pointer hover:scale-[1.02] flex items-center gap-1.5 ${
-                  isDark
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    : 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                } ${saveMultiLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  saveMultiLoading ? 'opacity-70 cursor-not-allowed' : ''
+                }`}
                 title="Save all items compiled into one quotation order in database"
               >
                 <span>💾</span> {saveMultiLoading ? 'Saving...' : 'Save Multi-Item Quote'}
@@ -2463,7 +2466,12 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
               type="button"
               onClick={handleSaveCustomerNameOnly}
               disabled={loading}
-              className="px-6 py-3.5 rounded-2xl font-black text-sm bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-lg cursor-pointer transition hover:scale-[1.02]"
+              style={{
+                backgroundColor: '#059669',
+                color: '#ffffff',
+                border: '1.5px solid #047857'
+              }}
+              className="px-6 py-3.5 rounded-2xl font-black text-sm shadow-lg cursor-pointer transition hover:scale-[1.02]"
             >
               {loading ? 'Saving...' : `💾 Save & Overwrite Customer Name (${formData.quoteNo || activeQuoteNo})`}
             </button>
@@ -2674,7 +2682,12 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
                     type="button"
                     onClick={handleSaveCustomerNameOnly}
                     disabled={loading}
-                    className="font-black py-3 px-6 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white border-emerald-400 shadow-md text-sm"
+                    style={{
+                      backgroundColor: '#059669',
+                      color: '#ffffff',
+                      border: '1.5px solid #047857'
+                    }}
+                    className="font-black py-3 px-6 rounded-2xl shadow-md transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] text-sm"
                     title="Save corrected customer name and overwrite this exact quotation"
                   >
                     {loading ? 'Saving...' : `💾 Save & Overwrite (${formData.quoteNo || activeQuoteNo})`}
@@ -2719,7 +2732,12 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
                         id="overwrite-quote-btn"
                         type="button"
                         onClick={saveQuote}
-                        className="font-black py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 border-amber-300 shadow-md"
+                        style={{
+                          backgroundColor: '#d97706',
+                          color: '#0f172a',
+                          border: '1.5px solid #b45309'
+                        }}
+                        className="font-black py-3 px-5 rounded-2xl shadow-md transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                         title="Save corrections and overwrite this exact quotation"
                       >
                         💾 Update & Overwrite ({activeQuoteNo})

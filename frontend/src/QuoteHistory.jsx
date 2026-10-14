@@ -611,11 +611,18 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
             const isInvalidForCompile = hasMultipleCustomers || hasMixedTax;
 
             return (
-              <div className={`p-4 mb-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border shadow-md animate-fade-in ${
-                isInvalidForCompile
-                  ? isDark ? 'bg-slate-900/90 border-slate-700 text-slate-200' : 'bg-amber-50/80 border-amber-300 text-amber-950'
-                  : isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-900'
-              }`}>
+              <div 
+                style={{
+                  backgroundColor: isDark ? '#1a2332' : '#fef9c3',
+                  borderColor: isDark ? '#c5a880' : '#eab308',
+                  borderWidth: '2px',
+                  borderStyle: 'solid'
+                }}
+                className={`p-4 mb-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md animate-fade-in ${
+                  isInvalidForCompile
+                    ? isDark ? 'text-slate-200' : 'text-amber-950'
+                    : isDark ? 'text-amber-200' : 'text-amber-950'
+                }`}>
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2 font-bold text-sm">
                     <span>☑️</span>
@@ -637,15 +644,21 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2.5 flex-wrap">
                   <button
                     type="button"
                     disabled={isInvalidForCompile}
                     onClick={handleCompileSelected}
-                    className={`px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md transition ${
+                    style={{
+                      backgroundColor: isInvalidForCompile ? '#9ca3af' : '#15803d',
+                      color: '#ffffff',
+                      border: '1.5px solid ' + (isInvalidForCompile ? '#6b7280' : '#166534'),
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                    }}
+                    className={`px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm transition ${
                       isInvalidForCompile 
-                        ? 'bg-gray-300 text-gray-500 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed opacity-60' 
-                        : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white hover:scale-[1.02] cursor-pointer'
+                        ? 'cursor-not-allowed opacity-60' 
+                        : 'hover:opacity-90 hover:scale-[1.02] cursor-pointer'
                     }`}
                     title={isInvalidForCompile ? "All compiled quotes must share the same customer and tax format" : "Compile selected into one official quotation document"}
                   >
@@ -658,7 +671,13 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                         setTargetCustomerName(custs[0] || '');
                         setShowBulkRenameModal(true);
                       }}
-                      className="px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white hover:scale-[1.02] cursor-pointer transition"
+                      style={{
+                        backgroundColor: '#1d4ed8',
+                        color: '#ffffff',
+                        border: '1.5px solid #1e40af',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                      }}
+                      className="px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm hover:opacity-90 hover:scale-[1.02] cursor-pointer transition"
                       title="Unify and overwrite customer name on all selected quotations (Admin only)"
                     >
                       ✏️ Rename Customer ({selectedQuoteIds.length})
@@ -669,7 +688,13 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                       type="button"
                       disabled={bulkDeleteLoading}
                       onClick={handleBulkDelete}
-                      className="px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white hover:scale-[1.02] cursor-pointer transition disabled:opacity-50"
+                      style={{
+                        backgroundColor: '#dc2626',
+                        color: '#ffffff',
+                        border: '1.5px solid #991b1b',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                      }}
+                      className="px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm hover:opacity-90 hover:scale-[1.02] cursor-pointer transition disabled:opacity-50"
                       title="Permanently delete all selected quotations (Admin only)"
                     >
                       {bulkDeleteLoading ? 'Deleting...' : `🗑️ Delete Selected (${selectedQuoteIds.length})`}
@@ -678,7 +703,12 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                   <button
                     type="button"
                     onClick={() => setSelectedQuoteIds([])}
-                    className="px-3 py-2 rounded-xl font-bold text-xs bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 cursor-pointer transition"
+                    style={{
+                      backgroundColor: isDark ? '#334155' : '#e2e8f0',
+                      color: isDark ? '#f8fafc' : '#0f172a',
+                      border: '1.5px solid ' + (isDark ? '#475569' : '#cbd5e1')
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl font-bold text-xs hover:opacity-80 cursor-pointer transition"
                   >
                     Clear Selection
                   </button>
@@ -881,7 +911,12 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                       {canDelete && (
                         <button
                           onClick={() => handleLoadForCustomerEdit(quote)}
-                          className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60"
+                          style={{
+                            backgroundColor: isDark ? '#451a03' : '#fef3c7',
+                            color: isDark ? '#fcd34d' : '#92400e',
+                            border: '1.5px solid ' + (isDark ? '#78350f' : '#d97706')
+                          }}
+                          className="font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer"
                           title="Edit customer name in workspace (Admin only)"
                         >
                           ✏️ Edit Name
@@ -890,7 +925,12 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                       {canDelete && (
                         <button
                           onClick={() => handleDeleteQuote(quote.id, quote.quote_no)}
-                          className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
+                          style={{
+                            backgroundColor: isDark ? '#450a0a' : '#fee2e2',
+                            color: isDark ? '#f87171' : '#b91c1c',
+                            border: '1.5px solid ' + (isDark ? '#7f1d1d' : '#ef4444')
+                          }}
+                          className="font-bold px-2.5 py-1.5 rounded-lg border transition cursor-pointer"
                           title="Delete Quote"
                         >
                           🗑️
@@ -972,7 +1012,12 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                 type="button"
                 disabled={bulkRenameLoading || !targetCustomerName.trim()}
                 onClick={handleBulkRenameCustomer}
-                className="px-5 py-2 rounded-xl text-xs font-black shadow-md bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white cursor-pointer transition disabled:opacity-50"
+                style={{
+                  backgroundColor: '#1d4ed8',
+                  color: '#ffffff',
+                  border: '1.5px solid #1e40af'
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-black shadow-md hover:opacity-90 cursor-pointer transition disabled:opacity-50"
               >
                 {bulkRenameLoading ? 'Updating...' : `💾 Apply & Overwrite on ${selectedQuoteIds.length} Quote(s)`}
               </button>
