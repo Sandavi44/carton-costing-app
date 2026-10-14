@@ -334,6 +334,7 @@ function App() {
             setFormData={setFormData} 
             calculatedCost={calculatedCost} 
             setCalculatedCost={setCalculatedCost} 
+            setActiveTab={setActiveTab}
             theme={theme}
           />
         )}

@@ -426,7 +426,7 @@ export const getProposedCosts = (carton, category, isTwoUp = false, rates = {}) 
 // MAIN COSTINGAPP COMPONENT
 // ============================================================================
 
-export default function CostingApp({ user, formData, setFormData, calculatedCost, setCalculatedCost, theme }) {
+export default function CostingApp({ user, formData, setFormData, calculatedCost, setCalculatedCost, setActiveTab, theme }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [nextQuoteNo, setNextQuoteNo] = useState('');
@@ -445,6 +445,10 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
   // Active Working Quotation State (In-Session Overwrite)
   const [activeQuoteId, setActiveQuoteId] = useState(null);
   const [activeQuoteNo, setActiveQuoteNo] = useState(null);
+
+  // Admin Old Quote Customer Name Only Edit Mode
+  const isCustomerNameOnlyEdit = Boolean(formData.isCustomerNameOnlyEdit && user?.is_admin);
+  const [customerSuggestions, setCustomerSuggestions] = useState([]);
 
   // Multi-item quotation states
   const [quotationItems, setQuotationItems] = useState([]);
@@ -465,6 +469,22 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
     }
   };
 
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const res = await axios.get('/api/customers', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        });
+        if (Array.isArray(res.data)) {
+          setCustomerSuggestions(res.data);
+        }
+      } catch (e) {
+        // non-blocking
+      }
+    };
+    fetchCustomers();
+  }, []);
+
   const handleStartNewQuote = () => {
     if (activeQuoteId) {
       const confirmReset = window.confirm(`Exit active quote ${activeQuoteNo} and start a new quotation? Future saves will receive a new QT number.`);
@@ -472,7 +492,52 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
     }
     setActiveQuoteId(null);
     setActiveQuoteNo(null);
+    setFormData(prev => ({
+      ...prev,
+      isEditing: false,
+      isCustomerNameOnlyEdit: false,
+      editQuoteId: null,
+      quoteNo: ''
+    }));
     fetchNextQuoteNumber();
+  };
+
+  const handleSaveCustomerNameOnly = async () => {
+    const targetId = formData.editQuoteId || activeQuoteId;
+    const targetNo = formData.quoteNo || activeQuoteNo;
+    const newName = (formData.customerName || '').trim();
+    if (!newName) {
+      setError('Customer name cannot be empty.');
+      return;
+    }
+    if (!targetId) {
+      setError('No target quotation ID found to update.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await axios.post(`/api/quotes/${targetId}/update-customer-name`, {
+        customer_name: newName
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+      });
+      alert(`✅ Customer name for ${targetNo} updated & overwritten successfully to "${newName}"!`);
+      setFormData(prev => ({
+        ...prev,
+        isEditing: false,
+        isCustomerNameOnlyEdit: false,
+        editQuoteId: null,
+        quoteNo: ''
+      }));
+      if (setActiveTab) {
+        setActiveTab('history');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update customer name.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Convert input dimension value to mm rounded to nearest whole mm for all internal formulas and database persistence
@@ -1286,7 +1351,35 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         <h2 className="text-2xl font-bold flex items-center gap-2">
           <span>🏭</span> Enter Costing Parameters
         </h2>
-        {activeQuoteNo ? (
+        {isCustomerNameOnlyEdit ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`px-4 py-1.5 rounded-full text-sm font-extrabold tracking-wide border shadow-xs ${
+              isDark 
+                ? 'bg-amber-950/60 text-[#d4af37] border-[#d4af37]/40' 
+                : isSand
+                  ? 'bg-[#f5ebd7] text-[#8c734b] border-[#8c734b]/40'
+                  : 'bg-amber-100/80 text-[#8c734b] border-[#8c734b]/40'
+            }`}>
+              ✏️ Editing: {formData.quoteNo || activeQuoteNo}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  isEditing: false,
+                  isCustomerNameOnlyEdit: false,
+                  editQuoteId: null,
+                  quoteNo: ''
+                }));
+                if (setActiveTab) setActiveTab('history');
+              }}
+              className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 transition cursor-pointer"
+            >
+              ✕ Exit Edit
+            </button>
+          </div>
+        ) : activeQuoteNo ? (
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`px-4 py-1.5 rounded-full text-sm font-extrabold tracking-wide border shadow-xs ${
               isDark 
@@ -1318,6 +1411,43 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
           </span>
         ) : null}
       </div>
+
+      {isCustomerNameOnlyEdit && (
+        <div className={`p-4 mb-6 rounded-2xl border text-sm font-semibold flex flex-wrap items-center justify-between gap-3 shadow-md animate-fade-in ${
+          isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-900'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🔒</span>
+            <div>
+              <p className="font-extrabold text-sm sm:text-base">
+                Admin Customer Name Correction Mode: {formData.quoteNo || activeQuoteNo}
+              </p>
+              <p className="text-xs opacity-90 mt-0.5">
+                Only the <strong>Customer Name</strong> is editable. All carton dimensions, material specs, and costing rates are locked to preserve quotation integrity.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveCustomerNameOnly}
+              className="px-4 py-2 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white cursor-pointer shadow-md transition hover:scale-[1.02]"
+            >
+              💾 Save & Overwrite ({formData.quoteNo || activeQuoteNo})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormData(prev => ({ ...prev, isEditing: false, isCustomerNameOnlyEdit: false, editQuoteId: null, quoteNo: '' }));
+                if (setActiveTab) setActiveTab('history');
+              }}
+              className="px-3 py-2 rounded-xl font-bold text-xs bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 cursor-pointer transition"
+            >
+              ✕ Exit
+            </button>
+          </div>
+        </div>
+      )}
 
       {addedItemSuccess && (
         <div className="bg-emerald-100 dark:bg-emerald-950/60 border-l-4 border-emerald-600 p-4 mb-6 rounded-lg text-sm flex items-center justify-between">
@@ -1469,10 +1599,11 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
           </h3>
           <div className={`flex items-center gap-1 p-1 rounded-xl border text-xs font-bold ${
             isDark ? 'bg-slate-800/80 border-slate-700' : isSand ? 'bg-[#faf8f5] border-[#dfd5bc]' : 'bg-[#ffffff]/90 border-[#bbf7d0]'
-          }`}>
+          } ${isCustomerNameOnlyEdit ? 'opacity-50 pointer-events-none' : ''}`}>
             <span className="text-[11px] px-1 opacity-70">Unit:</span>
             <button
               type="button"
+              disabled={isCustomerNameOnlyEdit}
               onClick={() => handleUnitChange('mm')}
               className={`px-3 py-1 rounded-lg transition-all cursor-pointer select-none text-xs font-bold ${
                 dimUnit === 'mm'
@@ -1484,6 +1615,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
             </button>
             <button
               type="button"
+              disabled={isCustomerNameOnlyEdit}
               onClick={() => handleUnitChange('inches')}
               className={`px-3 py-1 rounded-lg transition-all cursor-pointer select-none text-xs font-bold ${
                 dimUnit === 'inches'
@@ -1497,17 +1629,27 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         </div>
         
         <div className="mb-4">
-          <label className={labelClass}>Customer Name</label>
+          <label className={labelClass}>
+            Customer Name {isCustomerNameOnlyEdit && <span className="text-amber-600 dark:text-amber-400 font-extrabold text-xs ml-1.5">(✏️ Editable by Admin)</span>}
+          </label>
           <input
             type="text"
             name="customerName"
-            placeholder=""
+            list="customer-suggestions"
+            placeholder="Type or select customer name..."
             value={formData.customerName}
             onChange={handleInputChange}
-            className={inputClass}
+            className={`${inputClass} ${isCustomerNameOnlyEdit ? 'ring-2 ring-amber-500 font-bold bg-amber-500/10' : ''}`}
+            autoFocus={isCustomerNameOnlyEdit}
           />
+          <datalist id="customer-suggestions">
+            {customerSuggestions.map((cust, i) => (
+              <option key={i} value={cust} />
+            ))}
+          </datalist>
         </div>
 
+        <fieldset disabled={isCustomerNameOnlyEdit} style={{ border: 'none', padding: 0, margin: 0, minWidth: 0 }} className={isCustomerNameOnlyEdit ? "opacity-60 pointer-events-none select-none" : ""}>
         {/* CARTON TYPE DROPDOWN */}
         <div className="mb-4">
           <label className={labelClass}>Carton Type</label>
@@ -1665,8 +1807,10 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
             </div>
           </div>
         )}
+        </fieldset>
       </div>
 
+      <fieldset disabled={isCustomerNameOnlyEdit} style={{ border: 'none', padding: 0, margin: 0, minWidth: 0 }} className={isCustomerNameOnlyEdit ? "opacity-60 pointer-events-none select-none" : ""}>
       {/* SECTION 2: PLY & BOARD TYPE */}
       <div className={`${cardClass} mb-6`}>
         <h3 className={headingClass}>📊 Material Type</h3>
@@ -2264,35 +2408,67 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
           </div>
         </div>
       </div>
+      </fieldset>
 
-      <button
-        type="button"
-        onClick={calculateCost}
-        disabled={loading}
-        style={{
-          backgroundColor: isDark ? '#d4af37' : isSand ? '#8c734b' : '#15803d',
-          color: isDark ? '#0f172a' : '#ffffff',
-          display: 'block',
-          width: '100%',
-          visibility: 'visible',
-          opacity: loading ? 0.6 : 1
-        }}
-        className={`w-full ${
-          isDark 
-            ? 'bg-[#d4af37] text-[#0f172a]' 
-            : isSand 
-              ? 'bg-[#8c734b] text-white' 
-              : 'bg-[#15803d] text-white'
-        } bg-gradient-to-r ${
-          isDark 
-            ? 'from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
-            : isSand
-              ? 'from-[#8c734b] to-[#5c4c36] hover:from-[#a08457] hover:to-[#6d5a40]'
-              : 'from-[#16a34a] to-[#15803d] hover:from-[#22c55e] hover:to-[#16a34a]'
-        } font-bold py-4 rounded-2xl transition duration-150 cursor-pointer shadow-lg text-sm uppercase tracking-wider mt-4`}
-      >
-        {loading ? '🔄 Calculating...' : '✨ Calculate Cost'}
-      </button>
+      {isCustomerNameOnlyEdit ? (
+        <div className="mt-6 p-6 rounded-3xl bg-amber-500/10 border-2 border-amber-500/30 text-center shadow-lg">
+          <p className="text-base font-extrabold text-amber-700 dark:text-amber-300 flex items-center justify-center gap-2">
+            <span>🔒</span> Costing Parameters Locked ({formData.quoteNo || activeQuoteNo})
+          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 max-w-xl mx-auto">
+            You are editing the Customer Name only. Costing calculations and carton specifications remain intact as originally quoted.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={handleSaveCustomerNameOnly}
+              disabled={loading}
+              className="px-6 py-3.5 rounded-2xl font-black text-sm bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-lg cursor-pointer transition hover:scale-[1.02]"
+            >
+              {loading ? 'Saving...' : `💾 Save & Overwrite Customer Name (${formData.quoteNo || activeQuoteNo})`}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormData(prev => ({ ...prev, isEditing: false, isCustomerNameOnlyEdit: false, editQuoteId: null, quoteNo: '' }));
+                if (setActiveTab) setActiveTab('history');
+              }}
+              className="px-4 py-3.5 rounded-2xl font-bold text-xs bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 cursor-pointer transition"
+            >
+              ✕ Exit Edit Mode
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={calculateCost}
+          disabled={loading}
+          style={{
+            backgroundColor: isDark ? '#d4af37' : isSand ? '#8c734b' : '#15803d',
+            color: isDark ? '#0f172a' : '#ffffff',
+            display: 'block',
+            width: '100%',
+            visibility: 'visible',
+            opacity: loading ? 0.6 : 1
+          }}
+          className={`w-full ${
+            isDark 
+              ? 'bg-[#d4af37] text-[#0f172a]' 
+              : isSand 
+                ? 'bg-[#8c734b] text-white' 
+                : 'bg-[#15803d] text-white'
+          } bg-gradient-to-r ${
+            isDark 
+              ? 'from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
+              : isSand
+                ? 'from-[#8c734b] to-[#5c4c36] hover:from-[#a08457] hover:to-[#6d5a40]'
+                : 'from-[#16a34a] to-[#15803d] hover:from-[#22c55e] hover:to-[#16a34a]'
+          } font-bold py-4 rounded-2xl transition duration-150 cursor-pointer shadow-lg text-sm uppercase tracking-wider mt-4`}
+        >
+          {loading ? '🔄 Calculating...' : '✨ Calculate Cost'}
+        </button>
+      )}
 
       {/* RESULTS DISPLAY PANEL */}
       {calculatedCost && (
@@ -2450,61 +2626,87 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleAddItemToQuotation}
-                style={{
-                  backgroundColor: isDark ? '#d4af37' : '#ffffff',
-                  color: isDark ? '#0f172a' : isSand ? '#5c4c36' : '#14532d',
-                  visibility: 'visible',
-                  display: 'inline-flex'
-                }}
-                className={`font-black py-3 px-6 rounded-2xl shadow-lg transition duration-150 cursor-pointer hover:scale-[1.03] active:scale-[0.97] items-center gap-2 ${
-                  isDark 
-                    ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
-                    : isSand
-                      ? 'bg-white hover:bg-[#faf8f5] text-[#5c4c36]'
-                      : 'bg-white hover:bg-[#faf8f5] text-[#14532d]'
-                }`}
-                title="Add this item into the compiled quotation"
-              >
-                <span>➕</span> Add Item to Quotation
-              </button>
-
-              {activeQuoteId ? (
+              {isCustomerNameOnlyEdit ? (
                 <>
                   <button
                     type="button"
-                    onClick={saveQuote}
-                    className="font-black py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 border-amber-300 shadow-md"
-                    title="Save corrections and overwrite this exact quotation"
+                    onClick={handleSaveCustomerNameOnly}
+                    disabled={loading}
+                    className="font-black py-3 px-6 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white border-emerald-400 shadow-md text-sm"
+                    title="Save corrected customer name and overwrite this exact quotation"
                   >
-                    💾 Update & Overwrite ({activeQuoteNo})
+                    {loading ? 'Saving...' : `💾 Save & Overwrite (${formData.quoteNo || activeQuoteNo})`}
                   </button>
                   <button
                     type="button"
-                    onClick={handleStartNewQuote}
-                    className="font-bold py-3 px-4 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-white/20 border-white/40 text-white hover:bg-white/30"
-                    title="Clear active quote session and begin a new quotation"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, isEditing: false, isCustomerNameOnlyEdit: false, editQuoteId: null, quoteNo: '' }));
+                      if (setActiveTab) setActiveTab('history');
+                    }}
+                    className="font-bold py-3 px-4 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-white/20 border-white/40 text-white hover:bg-white/30 text-xs sm:text-sm"
                   >
-                    ➕ New Quote
+                    ✕ Exit Edit Mode
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={saveQuote}
-                  className={`font-bold py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-                    isDark 
-                      ? 'bg-[#1a2332]/80 border-[#c5a880]/30 text-[#e2d4c0] hover:bg-[#1a2332]' 
-                      : isSand
-                        ? 'bg-[#5c4c36]/20 border-white/50 text-white hover:bg-[#5c4c36]/30'
-                        : 'bg-[#14532d]/20 border-white/50 text-white hover:bg-[#14532d]/30'
-                  }`}
-                  title="Save directly as a single item quote"
-                >
-                  💾 Save Single Quote
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleAddItemToQuotation}
+                    style={{
+                      backgroundColor: isDark ? '#d4af37' : '#ffffff',
+                      color: isDark ? '#0f172a' : isSand ? '#5c4c36' : '#14532d',
+                      visibility: 'visible',
+                      display: 'inline-flex'
+                    }}
+                    className={`font-black py-3 px-6 rounded-2xl shadow-lg transition duration-150 cursor-pointer hover:scale-[1.03] active:scale-[0.97] items-center gap-2 ${
+                      isDark 
+                        ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
+                        : isSand
+                          ? 'bg-white hover:bg-[#faf8f5] text-[#5c4c36]'
+                          : 'bg-white hover:bg-[#faf8f5] text-[#14532d]'
+                    }`}
+                    title="Add this item into the compiled quotation"
+                  >
+                    <span>➕</span> Add Item to Quotation
+                  </button>
+
+                  {activeQuoteId ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={saveQuote}
+                        className="font-black py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 border-amber-300 shadow-md"
+                        title="Save corrections and overwrite this exact quotation"
+                      >
+                        💾 Update & Overwrite ({activeQuoteNo})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleStartNewQuote}
+                        className="font-bold py-3 px-4 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-white/20 border-white/40 text-white hover:bg-white/30"
+                        title="Clear active quote session and begin a new quotation"
+                      >
+                        ➕ New Quote
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={saveQuote}
+                      className={`font-bold py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
+                        isDark 
+                          ? 'bg-[#1a2332]/80 border-[#c5a880]/30 text-[#e2d4c0] hover:bg-[#1a2332]' 
+                          : isSand
+                            ? 'bg-[#5c4c36]/20 border-white/50 text-white hover:bg-[#5c4c36]/30'
+                            : 'bg-[#14532d]/20 border-white/50 text-white hover:bg-[#14532d]/30'
+                      }`}
+                      title="Save directly as a single item quote"
+                    >
+                      💾 Save Single Quote
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

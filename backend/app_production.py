@@ -1086,6 +1086,128 @@ def bulk_delete_quotes():
         return jsonify({'error': str(e)}), 400
 
 
+@app.route('/api/customers', methods=['GET'])
+@jwt_required()
+def get_customers():
+    """Get list of distinct customer names"""
+    try:
+        customers = Customer.query.order_by(Customer.name.asc()).all()
+        names = [c.name for c in customers if c.name and c.name.strip()]
+        return jsonify(names), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/quotes/<int:quote_id>/update-customer-name', methods=['PUT', 'POST'])
+@jwt_required()
+def update_quote_customer_name(quote_id):
+    """Update only customer name for an existing quotation - Admin only"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user or not user.is_admin:
+            return jsonify({'error': 'Only Admin has authority to edit customer name on existing quotations.'}), 403
+
+        quote = Quote.query.get(quote_id)
+        if not quote:
+            return jsonify({'error': 'Quote not found'}), 404
+
+        data = request.get_json() or {}
+        new_name = (data.get('customer_name') or data.get('customerName') or '').strip()
+        if not new_name:
+            return jsonify({'error': 'Customer name cannot be empty'}), 400
+
+        customer = Customer.query.filter_by(name=new_name).first()
+        if not customer:
+            customer = Customer(name=new_name)
+            db.session.add(customer)
+            db.session.flush()
+
+        quote.customer_name = new_name
+        quote.customer_id = customer.id
+
+        if quote.items:
+            try:
+                items_data = json.loads(quote.items) if isinstance(quote.items, str) else quote.items
+                if isinstance(items_data, list):
+                    for it in items_data:
+                        if isinstance(it, dict):
+                            it['customerName'] = new_name
+                            it['customer_name'] = new_name
+                    quote.items = json.dumps(items_data)
+            except Exception:
+                pass
+
+        db.session.commit()
+        quote_no = f"QT-{str(quote.id).zfill(5)}"
+        return jsonify({
+            'message': f'Customer name for {quote_no} updated successfully to "{new_name}"',
+            'quote_no': quote_no,
+            'customer_name': new_name
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/quotes/bulk-update-customer-name', methods=['POST'])
+@jwt_required()
+def bulk_update_customer_name():
+    """Bulk update customer name for multiple quotations to make them uniform - Admin only"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user or not user.is_admin:
+            return jsonify({'error': 'Only Admin has authority to edit customer name on existing quotations.'}), 403
+
+        data = request.get_json() or {}
+        quote_ids = data.get('quote_ids', [])
+        new_name = (data.get('customer_name') or data.get('customerName') or '').strip()
+
+        if not quote_ids or not isinstance(quote_ids, list):
+            return jsonify({'error': 'No quote IDs provided'}), 400
+        if not new_name:
+            return jsonify({'error': 'Customer name cannot be empty'}), 400
+
+        customer = Customer.query.filter_by(name=new_name).first()
+        if not customer:
+            customer = Customer(name=new_name)
+            db.session.add(customer)
+            db.session.flush()
+
+        updated_count = 0
+        for qid in quote_ids:
+            try:
+                quote = Quote.query.get(int(qid))
+                if quote:
+                    quote.customer_name = new_name
+                    quote.customer_id = customer.id
+                    if quote.items:
+                        try:
+                            items_data = json.loads(quote.items) if isinstance(quote.items, str) else quote.items
+                            if isinstance(items_data, list):
+                                for it in items_data:
+                                    if isinstance(it, dict):
+                                        it['customerName'] = new_name
+                                        it['customer_name'] = new_name
+                                quote.items = json.dumps(items_data)
+                        except Exception:
+                            pass
+                    updated_count += 1
+            except Exception:
+                continue
+
+        db.session.commit()
+        return jsonify({
+            'message': f'Successfully updated customer name to "{new_name}" on {updated_count} quotation(s)',
+            'updated_count': updated_count,
+            'customer_name': new_name
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
 @app.route('/api/health', methods=['GET'])
 def health():
     """Lightweight ping endpoint for uptime monitors to prevent Render cold starts"""

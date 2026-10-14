@@ -14,6 +14,10 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  const [showBulkRenameModal, setShowBulkRenameModal] = useState(false);
+  const [targetCustomerName, setTargetCustomerName] = useState('');
+  const [bulkRenameLoading, setBulkRenameLoading] = useState(false);
+  const [customerList, setCustomerList] = useState([]);
 
   // Multi-quote selection state for batch compilation
   const [selectedQuoteIds, setSelectedQuoteIds] = useState([]);
@@ -59,8 +63,22 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
     }
   };
 
+  const fetchCustomers = async () => {
+    try {
+      const res = await axios.get('/api/customers', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      if (Array.isArray(res.data)) {
+        setCustomerList(res.data);
+      }
+    } catch (e) {
+      // non-blocking
+    }
+  };
+
   useEffect(() => {
     fetchHistory();
+    fetchCustomers();
   }, []);
 
   const [successMsg, setSuccessMsg] = useState('');
@@ -112,6 +130,137 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
       alert(err.response?.data?.error || 'Failed to delete selected quotations');
     } finally {
       setBulkDeleteLoading(false);
+    }
+  };
+
+  const handleBulkRenameCustomer = async () => {
+    const trimmed = targetCustomerName.trim();
+    if (!trimmed) {
+      alert('Please enter or select a customer name.');
+      return;
+    }
+    const count = selectedQuoteIds.length;
+    setBulkRenameLoading(true);
+    try {
+      const res = await axios.post('/api/quotes/bulk-update-customer-name', {
+        quote_ids: selectedQuoteIds,
+        customer_name: trimmed
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+
+      setQuotes(prev => prev.map(q => selectedQuoteIds.includes(q.id) ? { ...q, customer_name: trimmed } : q));
+      setShowBulkRenameModal(false);
+      setSuccessMsg(res.data?.message || `Updated customer name to "${trimmed}" on ${count} quotation(s).`);
+      setTimeout(() => setSuccessMsg(''), 5000);
+      fetchCustomers();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update customer name.');
+    } finally {
+      setBulkRenameLoading(false);
+    }
+  };
+
+  const handleLoadForCustomerEdit = async (quote) => {
+    if (!canDelete) {
+      alert('Only Admin has authority to edit customer name on existing quotations.');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const response = await axios.get(`/api/quotes/${quote.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      const q = response.data;
+      const gsmArray = q.gsm_values || [];
+
+      setFormData({
+        customerName: q.customer_name || '',
+        cartonLength: q.dimensions?.length_mm || q.carton_length_mm || '',
+        cartonWidth: q.dimensions?.width_mm || q.carton_width_mm || '',
+        cartonHeight: q.dimensions?.height_mm || q.carton_height_mm || '',
+        quantity: q.quantity || '',
+        plyType: q.ply_type || '3-Ply',
+        boardType: (q.board_type && q.board_type.toLowerCase().includes('white')) ? 'White Liner' : 'Brown Liner',
+        fluteType: q.flute_type || 'B-Flute',
+        fluteType2: q.flute_type_2 || q.flute_type || 'B-Flute',
+        productionMethod: q.production_method || 'In-house',
+        cartonType: q.carton_type || 'RSC',
+        dieLength: q.die_length_mm ? String(q.die_length_mm) : '',
+        dieWidth: q.die_width_mm ? String(q.die_width_mm) : '',
+        quoteNo: q.quote_no || `QT-${String(q.id).padStart(5, '0')}`,
+        isEditing: true,
+        isCustomerNameOnlyEdit: true,
+        editQuoteId: q.id,
+        joiningType: q.joining_type || 'Glued',
+        isPrinted: q.is_printed || false,
+        printName: q.print_name || '',
+        whiteLinerRate: q.white_liner_rate ? String(q.white_liner_rate) : '',
+        brownLinerRate: q.brown_liner_rate ? String(q.brown_liner_rate) : '',
+        gsm1: gsmArray[0] !== undefined ? String(gsmArray[0]) : '',
+        gsm2: gsmArray[1] !== undefined ? String(gsmArray[1]) : '',
+        gsm3: gsmArray[2] !== undefined ? String(gsmArray[2]) : '',
+        gsm4: gsmArray[3] !== undefined ? String(gsmArray[3]) : '',
+        gsm5: gsmArray[4] !== undefined ? String(gsmArray[4]) : '',
+        gsm6: gsmArray[5] !== undefined ? String(gsmArray[5]) : '',
+        gsm7: gsmArray[6] !== undefined ? String(gsmArray[6]) : '',
+        totalOverheadForOrder: q.total_overhead_for_order !== undefined ? String(q.total_overhead_for_order) : '',
+        joiningCost: q.joining_cost !== undefined ? String(q.joining_cost) : '',
+        printCost: q.print_cost !== undefined ? String(q.print_cost) : '',
+        slottingCost: q.slotting_cost !== undefined ? String(q.slotting_cost) : '',
+        bundlingCost: q.bundling_cost !== undefined ? String(q.bundling_cost) : '',
+        diecuttingCost: q.diecutting_cost !== undefined ? String(q.diecutting_cost) : '',
+        profitMargin: q.profit_margin_percent !== undefined ? String(q.profit_margin_percent) : '15',
+        taxType: q.tax_type?.includes('VAT') && !q.tax_type?.includes('Non-VAT') ? 'VAT' : 'Non-VAT',
+        hasInhouseCommission: q.has_inhouse_commission || false,
+        hasThirdPartyCommission: q.has_third_party_commission || false,
+        thirdPartyCommission: q.third_party_commission !== undefined ? String(q.third_party_commission) : '',
+        hasTransport: q.has_transport || false,
+        transportCost: q.transport_cost !== undefined ? String(q.transport_cost) : '',
+        transportOption: q.transport_option || (q.has_transport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
+        oneTimeDieCost: q.die_making_cost ? String(q.die_making_cost) : '',
+        oneTimeBlockCost: q.block_making_cost ? String(q.block_making_cost) : '',
+        oneTimeTransportCost: q.one_time_transport_cost ? String(q.one_time_transport_cost) : '',
+        paymentMethod: q.payment_method || 'Credit - 30 Days',
+        dimensionUnit: q.dimension_unit || 'mm',
+      });
+
+      if (q.final_cost_per_carton || q.calculated_cost) {
+        setCalculatedCost(q.calculated_cost || {
+          final: {
+            final_cost_per_carton: q.final_cost_per_carton,
+            total_cost_batch: q.total_cost_batch
+          },
+          sheet_dimensions: q.sheet_dimensions || {
+            sheet_length_mm: q.sheet_length_mm,
+            sheet_width_mm: q.sheet_width_mm,
+            board_area_m2: q.board_area_m2,
+            selected_reel_mm: q.selected_reel_mm,
+            sheets_per_reel: q.sheets_per_reel,
+            reel_waste_mm: q.reel_waste_mm
+          },
+          rates: {
+            rm_cost_per_carton: q.rm_cost_per_carton || 0
+          },
+          profit: {
+            profit_amount: q.profit_per_carton || 0
+          },
+          tax: {
+            tax_type: q.tax_type,
+            tax_amount_per_carton: q.tax_amount_per_carton || 0
+          },
+          material: {
+            total_gsm: 0,
+            weight_per_sheet_kg: 0
+          }
+        });
+      }
+
+      setActiveTab('calculator');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to load quote details');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -505,6 +654,19 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                   {canDelete && (
                     <button
                       type="button"
+                      onClick={() => {
+                        setTargetCustomerName(custs[0] || '');
+                        setShowBulkRenameModal(true);
+                      }}
+                      className="px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white hover:scale-[1.02] cursor-pointer transition"
+                      title="Unify and overwrite customer name on all selected quotations (Admin only)"
+                    >
+                      ✏️ Rename Customer ({selectedQuoteIds.length})
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
                       disabled={bulkDeleteLoading}
                       onClick={handleBulkDelete}
                       className="px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white hover:scale-[1.02] cursor-pointer transition disabled:opacity-50"
@@ -718,6 +880,15 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                       </button>
                       {canDelete && (
                         <button
+                          onClick={() => handleLoadForCustomerEdit(quote)}
+                          className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60"
+                          title="Edit customer name in workspace (Admin only)"
+                        >
+                          ✏️ Edit Name
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
                           onClick={() => handleDeleteQuote(quote.id, quote.quote_no)}
                           className="font-semibold px-2.5 py-1.5 rounded-lg border transition cursor-pointer text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
                           title="Delete Quote"
@@ -734,6 +905,81 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
         </>
       )}
       </div>
+
+      {/* BULK RENAME CUSTOMER MODAL */}
+      {showBulkRenameModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+          <div className={`rounded-3xl shadow-2xl max-w-lg w-full p-6 relative border max-h-[90vh] flex flex-col overflow-y-auto ${
+            isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30' : 'bg-[#fcfaf7] text-[#5c4c36] border-[#dfd5bc]'
+          }`}>
+            <button
+              onClick={() => setShowBulkRenameModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-black dark:text-gray-300 dark:hover:text-white text-xl font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+            <h3 className={`text-lg font-black mb-1 flex items-center gap-2 ${isDark ? 'text-[#f5deb3]' : 'text-[#1a130b]'}`}>
+              <span>✏️</span> Unify Customer Name ({selectedQuoteIds.length} Quotations)
+            </h3>
+            <p className="text-xs mb-4 opacity-80">
+              Overwrites the customer name on all selected quotations to a single uniform customer name. Only Admin has authority to do this.
+            </p>
+
+            <div className={`p-3 rounded-xl border mb-4 text-xs ${
+              isDark ? 'bg-slate-900/60 border-slate-700/60 text-slate-300' : 'bg-white border-gray-200 text-gray-700'
+            }`}>
+              <p className="font-bold mb-1">Selected Quotations to Rename:</p>
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                {quotes.filter(q => selectedQuoteIds.includes(q.id)).map(q => (
+                  <span key={q.id} className="px-2 py-0.5 rounded-md font-mono text-[11px] bg-amber-500/15 border border-amber-500/30 font-semibold">
+                    {q.quote_no || `QT-${String(q.id).padStart(5, '0')}`}: <span className="opacity-90">{q.customer_name}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5">
+                Target Uniform Customer Name
+              </label>
+              <input
+                type="text"
+                list="bulk-customer-list"
+                value={targetCustomerName}
+                onChange={(e) => setTargetCustomerName(e.target.value)}
+                placeholder="Type or select unique customer name"
+                className={`w-full px-4 py-2.5 border-2 rounded-xl text-sm font-semibold focus:outline-none ${
+                  isDark ? 'bg-slate-800 border-amber-500/40 text-white' : 'bg-white border-amber-400 text-black'
+                }`}
+                autoFocus
+              />
+              <datalist id="bulk-customer-list">
+                {customerList.map((c, idx) => (
+                  <option key={idx} value={c} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowBulkRenameModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-200 hover:bg-gray-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={bulkRenameLoading || !targetCustomerName.trim()}
+                onClick={handleBulkRenameCustomer}
+                className="px-5 py-2 rounded-xl text-xs font-black shadow-md bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white cursor-pointer transition disabled:opacity-50"
+              >
+                {bulkRenameLoading ? 'Updating...' : `💾 Apply & Overwrite on ${selectedQuoteIds.length} Quote(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DETAIL MODAL - OFFICIAL QUOTATION REPORT */}
       {selectedQuote && (
