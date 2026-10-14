@@ -442,11 +442,38 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
   const isSand = theme === 'sand';
   const isGreen = !isDark && !isSand;
 
+  // Active Working Quotation State (In-Session Overwrite)
+  const [activeQuoteId, setActiveQuoteId] = useState(null);
+  const [activeQuoteNo, setActiveQuoteNo] = useState(null);
+
   // Multi-item quotation states
   const [quotationItems, setQuotationItems] = useState([]);
   const [showQuotationModal, setShowQuotationModal] = useState(false);
   const [saveMultiLoading, setSaveMultiLoading] = useState(false);
   const [addedItemSuccess, setAddedItemSuccess] = useState('');
+
+  const fetchNextQuoteNumber = async () => {
+    try {
+      const response = await axios.get('/api/quotes/next-number', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+      });
+      if (response.data?.quote_no) {
+        setNextQuoteNo(response.data.quote_no);
+      }
+    } catch (e) {
+      // Fallback or non-blocking
+    }
+  };
+
+  const handleStartNewQuote = () => {
+    if (activeQuoteId) {
+      const confirmReset = window.confirm(`Exit active quote ${activeQuoteNo} and start a new quotation? Future saves will receive a new QT number.`);
+      if (!confirmReset) return;
+    }
+    setActiveQuoteId(null);
+    setActiveQuoteNo(null);
+    fetchNextQuoteNumber();
+  };
 
   // Convert input dimension value to mm rounded to nearest whole mm for all internal formulas and database persistence
   const toMM = (val) => {
@@ -606,22 +633,10 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
 
   // Fetch next quote number when in new entry mode
   useEffect(() => {
-    const fetchNextNumber = async () => {
-      try {
-        const response = await axios.get('/api/quotes/next-number', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
-        });
-        if (response.data?.quote_no) {
-          setNextQuoteNo(response.data.quote_no);
-        }
-      } catch (e) {
-        // Fallback or non-blocking
-      }
-    };
-    if (!formData.isEditing) {
-      fetchNextNumber();
+    if (!activeQuoteId) {
+      fetchNextQuoteNumber();
     }
-  }, [formData.isEditing]);
+  }, [activeQuoteId]);
 
   // Synchronize auto-proposed process costs (Joining, Print, Slotting, Bundling)
   useEffect(() => {
@@ -985,6 +1000,8 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
       const isOutsource = formData.productionMethod === 'Outsource' || formData.productionMethod === 'Outsource SF';
       const response = await axios.post('/api/quotes/save', { 
         ...formData, 
+        quote_id: activeQuoteId,
+        id: activeQuoteId,
         cartonLength: mmLength,
         cartonWidth: mmWidth,
         cartonHeight: mmHeight,
@@ -1019,7 +1036,14 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
       }, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
-      alert(`Quote saved successfully! Order No: ${response.data.quote_no}`);
+
+      setActiveQuoteId(response.data.id);
+      setActiveQuoteNo(response.data.quote_no);
+      if (response.data.is_update) {
+        alert(`✅ Quotation ${response.data.quote_no} updated & overwritten successfully!`);
+      } else {
+        alert(`✅ Quotation saved successfully! Order No: ${response.data.quote_no}`);
+      }
     } catch (err) {
       const serverError = err.response?.data?.error || err.response?.data?.msg;
       if (serverError) {
@@ -1198,6 +1222,8 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
     setError('');
     try {
       const response = await axios.post('/api/quotes/save', {
+        quote_id: activeQuoteId,
+        id: activeQuoteId,
         customerName: formData.customerName,
         items: quotationItems,
         taxType: formData.taxType || 'Non-VAT',
@@ -1211,7 +1237,13 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
 
-      alert(`Multi-item quote saved successfully! Order No: ${response.data.quote_no}`);
+      setActiveQuoteId(response.data.id);
+      setActiveQuoteNo(response.data.quote_no);
+      if (response.data.is_update) {
+        alert(`✅ Multi-item quotation ${response.data.quote_no} updated & overwritten successfully!`);
+      } else {
+        alert(`✅ Multi-item quote saved successfully! Order No: ${response.data.quote_no}`);
+      }
       setQuotationItems([]);
       fetchNextQuoteNumber();
     } catch (err) {
@@ -1254,23 +1286,37 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         <h2 className="text-2xl font-bold flex items-center gap-2">
           <span>🏭</span> Enter Costing Parameters
         </h2>
-        {(formData.quoteNo || nextQuoteNo) && (
-          <span className={`px-4 py-1.5 rounded-full text-sm font-extrabold tracking-wide border shadow-xs ${
-            formData.isEditing
-              ? isDark 
+        {activeQuoteNo ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`px-4 py-1.5 rounded-full text-sm font-extrabold tracking-wide border shadow-xs ${
+              isDark 
                 ? 'bg-amber-950/60 text-[#d4af37] border-[#d4af37]/40' 
                 : isSand
                   ? 'bg-[#f5ebd7] text-[#8c734b] border-[#8c734b]/40'
-                  : 'bg-amber-100/80 text-[#8c734b] border-[#8c734b]/40'
-              : isDark 
-                ? 'bg-[#1a2332] text-[#d4af37] border-[#c5a880]/30' 
-                : isSand
-                  ? 'bg-[#faf8f5] text-[#8c734b] border-[#dfd5bc]'
-                  : 'bg-[#eaf5ea] text-[#166534] border-[#bbf7d0]'
+                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+            }`}>
+              💾 Working Quote: {activeQuoteNo} (In-Session Overwrite Active)
+            </span>
+            <button
+              type="button"
+              onClick={handleStartNewQuote}
+              className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 transition cursor-pointer"
+              title="Start a new quotation (will allocate a new QT number)"
+            >
+              ➕ Start New Quote
+            </button>
+          </div>
+        ) : (formData.quoteNo || nextQuoteNo) ? (
+          <span className={`px-4 py-1.5 rounded-full text-sm font-extrabold tracking-wide border shadow-xs ${
+            isDark 
+              ? 'bg-[#1a2332] text-[#d4af37] border-[#c5a880]/30' 
+              : isSand 
+                ? 'bg-[#faf8f5] text-[#8c734b] border-[#dfd5bc]' 
+                : 'bg-[#eaf5ea] text-[#166534] border-[#bbf7d0]'
           }`}>
-            {formData.isEditing ? `✏️ Editing: ${formData.quoteNo}` : `📋 Next Quote: ${nextQuoteNo}`}
+            📋 Next Quote: {nextQuoteNo || formData.quoteNo}
           </span>
-        )}
+        ) : null}
       </div>
 
       {addedItemSuccess && (
@@ -2425,20 +2471,41 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
                 <span>➕</span> Add Item to Quotation
               </button>
 
-              <button
-                type="button"
-                onClick={saveQuote}
-                className={`font-bold py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-                  isDark 
-                    ? 'bg-[#1a2332]/80 border-[#c5a880]/30 text-[#e2d4c0] hover:bg-[#1a2332]' 
-                    : isSand
-                      ? 'bg-[#5c4c36]/20 border-white/50 text-white hover:bg-[#5c4c36]/30'
-                      : 'bg-[#14532d]/20 border-white/50 text-white hover:bg-[#14532d]/30'
-                }`}
-                title="Save directly as a single item quote"
-              >
-                💾 Save Single Quote
-              </button>
+              {activeQuoteId ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={saveQuote}
+                    className="font-black py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 border-amber-300 shadow-md"
+                    title="Save corrections and overwrite this exact quotation"
+                  >
+                    💾 Update & Overwrite ({activeQuoteNo})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStartNewQuote}
+                    className="font-bold py-3 px-4 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-white/20 border-white/40 text-white hover:bg-white/30"
+                    title="Clear active quote session and begin a new quotation"
+                  >
+                    ➕ New Quote
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={saveQuote}
+                  className={`font-bold py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
+                    isDark 
+                      ? 'bg-[#1a2332]/80 border-[#c5a880]/30 text-[#e2d4c0] hover:bg-[#1a2332]' 
+                      : isSand
+                        ? 'bg-[#5c4c36]/20 border-white/50 text-white hover:bg-[#5c4c36]/30'
+                        : 'bg-[#14532d]/20 border-white/50 text-white hover:bg-[#14532d]/30'
+                  }`}
+                  title="Save directly as a single item quote"
+                >
+                  💾 Save Single Quote
+                </button>
+              )}
             </div>
           </div>
         </div>

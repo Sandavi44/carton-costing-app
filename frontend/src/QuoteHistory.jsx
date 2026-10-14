@@ -11,9 +11,9 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
   const canDelete = Boolean(user?.is_admin || user?.can_delete);
 
   // Modals / Action States
-  const [actionPromptQuote, setActionPromptQuote] = useState(null);
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   // Multi-quote selection state for batch compilation
   const [selectedQuoteIds, setSelectedQuoteIds] = useState([]);
@@ -77,14 +77,41 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
       });
       setQuotes(prev => prev.filter(q => q.id !== quoteId));
+      setSelectedQuoteIds(prev => prev.filter(id => id !== quoteId));
       if (selectedQuote && selectedQuote.id === quoteId) setSelectedQuote(null);
-      if (actionPromptQuote && actionPromptQuote.id === quoteId) setActionPromptQuote(null);
       setSuccessMsg(`Quote ${displayNo} deleted successfully.`);
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to delete quote');
     } finally {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedQuoteIds.length === 0) return;
+    const count = selectedQuoteIds.length;
+    const confirmed = window.confirm(`Are you sure you want to permanently delete ${count} selected quotation(s)? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setBulkDeleteLoading(true);
+    try {
+      const response = await axios.post('/api/quotes/bulk-delete', {
+        quote_ids: selectedQuoteIds
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+
+      const deletedIds = new Set(selectedQuoteIds);
+      setQuotes(prev => prev.filter(q => !deletedIds.has(q.id)));
+      if (selectedQuote && deletedIds.has(selectedQuote.id)) setSelectedQuote(null);
+      setSelectedQuoteIds([]);
+      setSuccessMsg(response.data?.message || `Successfully deleted ${count} quotation(s).`);
+      setTimeout(() => setSuccessMsg(''), 5000);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to delete selected quotations');
+    } finally {
+      setBulkDeleteLoading(false);
     }
   };
 
@@ -172,141 +199,15 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
     setSelectedQuote(compiledQuote);
   };
 
-  const handleRowClick = async (quoteId) => {
+  const handleViewQuote = async (quoteId) => {
     setActionLoading(true);
     try {
       const response = await axios.get(`/api/quotes/${quoteId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
       });
-      setActionPromptQuote(response.data);
+      setSelectedQuote(response.data);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to load quote details');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Helper to get GSM fields list based on ply type
-  const getGSMFields = (plyType) => {
-    switch(plyType) {
-      case '2-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }];
-      case '3-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }];
-      case '4-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }, { name: 'gsm4' }];
-      case '5-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }, { name: 'gsm4' }, { name: 'gsm5' }];
-      case '7-Ply': return [{ name: 'gsm1' }, { name: 'gsm2' }, { name: 'gsm3' }, { name: 'gsm4' }, { name: 'gsm5' }, { name: 'gsm6' }, { name: 'gsm7' }];
-      default: return [];
-    }
-  };
-
-  // Import quote into the main calculator workspace and execute calculator endpoint
-  const handleLoadToWorkspace = async (quote) => {
-    setActionLoading(true);
-    try {
-      const gsmArray = quote.gsm_values || [];
-      const newFormData = {
-        customerName: quote.customer_name || '',
-        cartonLength: quote.carton_length_mm || '',
-        cartonWidth: quote.carton_width_mm || '',
-        cartonHeight: quote.carton_height_mm || '',
-        quantity: quote.quantity || '',
-        plyType: quote.ply_type || '3-Ply',
-        boardType: (quote.board_type && quote.board_type.toLowerCase().includes('white')) ? 'White Liner' : 'Brown Liner',
-        fluteType: quote.flute_type || 'B-Flute',
-        fluteType2: quote.flute_type_2 || quote.flute_type || 'B-Flute',
-        productionMethod: quote.production_method || 'In-house',
-        cartonType: quote.carton_type || 'RSC',
-        dieLength: quote.die_length_mm !== undefined && quote.die_length_mm !== 0 ? quote.die_length_mm.toString() : '',
-        dieWidth: quote.die_width_mm !== undefined && quote.die_width_mm !== 0 ? quote.die_width_mm.toString() : '',
-        quoteNo: quote.quote_no || `QT-${String(quote.id).padStart(5, '0')}`,
-        isEditing: true,
-        joiningType: quote.joining_type || 'Glued',
-        isPrinted: quote.is_printed || false,
-        printName: quote.print_name || '',
-        whiteLinerRate: (quote.board_type && quote.board_type.toLowerCase().includes('white')) ? (quote.white_liner_rate || '') : '',
-        brownLinerRate: (!quote.board_type || !quote.board_type.toLowerCase().includes('white')) ? (quote.brown_liner_rate || '') : '',
-        gsm1: gsmArray[0] !== undefined ? gsmArray[0].toString() : '',
-        gsm2: gsmArray[1] !== undefined ? gsmArray[1].toString() : '',
-        gsm3: gsmArray[2] !== undefined ? gsmArray[2].toString() : '',
-        gsm4: gsmArray[3] !== undefined ? gsmArray[3].toString() : '',
-        gsm5: gsmArray[4] !== undefined ? gsmArray[4].toString() : '',
-        gsm6: gsmArray[5] !== undefined ? gsmArray[5].toString() : '',
-        gsm7: gsmArray[6] !== undefined ? gsmArray[6].toString() : '',
-        totalOverheadForOrder: quote.total_overhead_for_order !== undefined ? quote.total_overhead_for_order.toString() : '',
-        joiningCost: quote.joining_cost !== undefined ? quote.joining_cost.toString() : '',
-        printCost: quote.print_cost !== undefined ? quote.print_cost.toString() : '',
-        slottingCost: quote.slotting_cost !== undefined ? quote.slotting_cost.toString() : '',
-        bundlingCost: quote.bundling_cost !== undefined ? quote.bundling_cost.toString() : '',
-        bundlingCostManual: true, // Flag as overridden to preserve quote value
-        diecuttingCost: quote.diecutting_cost !== undefined ? quote.diecutting_cost.toString() : '',
-        profitMargin: quote.profit_margin_percent !== undefined ? quote.profit_margin_percent.toString() : '15',
-        taxType: quote.tax_type?.includes('VAT') && !quote.tax_type?.includes('Non-VAT') ? 'VAT' : 'Non-VAT',
-        hasInhouseCommission: quote.has_inhouse_commission || false,
-        hasThirdPartyCommission: quote.has_third_party_commission || false,
-        thirdPartyCommission: quote.third_party_commission !== undefined ? quote.third_party_commission.toString() : '',
-        hasTransport: quote.has_transport || false,
-        transportCost: quote.transport_cost !== undefined ? quote.transport_cost.toString() : '',
-        transportOption: quote.transport_option || (quote.has_transport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
-        oneTimeDieCost: (quote.die_making_cost && quote.die_making_cost > 0) ? String(quote.die_making_cost) : '',
-        oneTimeBlockCost: (quote.block_making_cost && quote.block_making_cost > 0) ? String(quote.block_making_cost) : '',
-        oneTimeTransportCost: (quote.one_time_transport_cost && quote.one_time_transport_cost > 0) ? String(quote.one_time_transport_cost) : '',
-        paymentMethod: quote.payment_method || 'Credit - 30 Days',
-        dimensionUnit: quote.dimension_unit || 'mm',
-      };
-
-      // Set forms state
-      setFormData(newFormData);
-
-      // Perform calculation immediately to sync visual layouts
-      const gsmFields = getGSMFields(newFormData.plyType);
-      const gsmValues = gsmFields.map(f => parseFloat(newFormData[f.name]) || 0);
-
-      const payload = {
-        customerName: newFormData.customerName,
-        carton_length_mm: parseFloat(newFormData.cartonLength),
-        carton_width_mm: parseFloat(newFormData.cartonWidth),
-        carton_height_mm: parseFloat(newFormData.cartonHeight),
-        quantity: parseInt(newFormData.quantity),
-        ply_type: newFormData.plyType,
-        board_type: newFormData.boardType,
-        flute_type: newFormData.fluteType,
-        flute_type_2: newFormData.fluteType2 || newFormData.fluteType,
-        production_method: newFormData.productionMethod || 'In-house',
-        carton_type: newFormData.cartonType || 'RSC',
-        die_length_mm: parseFloat(newFormData.dieLength || 0),
-        die_width_mm: parseFloat(newFormData.dieWidth || 0),
-        joining_type: newFormData.joiningType,
-        is_printed: newFormData.isPrinted,
-        gsm_values: JSON.stringify(gsmValues),
-        white_liner_rate: parseFloat(newFormData.whiteLinerRate || 0),
-        brown_liner_rate: parseFloat(newFormData.brownLinerRate || 0),
-        total_overhead_for_order: parseFloat(newFormData.totalOverheadForOrder || 0),
-        joining_cost: (newFormData.productionMethod === 'Outsource' || newFormData.productionMethod === 'Outsource SF' || newFormData.cartonType === 'S.F.') ? 0 : parseFloat(newFormData.joiningCost || 0),
-        print_cost: newFormData.isPrinted ? parseFloat(newFormData.printCost || 0) : 0,
-        slotting_cost: parseFloat(newFormData.slottingCost || 0),
-        bundling_cost: parseFloat(newFormData.bundlingCost || 0),
-        diecutting_cost: parseFloat(newFormData.diecuttingCost || 0),
-        profit_margin_percent: parseFloat(newFormData.profitMargin || 15),
-        tax_type: newFormData.taxType,
-        hasInhouseCommission: newFormData.hasInhouseCommission,
-        hasThirdPartyCommission: newFormData.hasThirdPartyCommission,
-        thirdPartyCommission: parseFloat(newFormData.thirdPartyCommission || 0),
-        hasTransport: newFormData.hasTransport,
-        transportCost: parseFloat(newFormData.transportCost || 0),
-      };
-
-      const calcResponse = await axios.post('/api/quotes/calculate', payload, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
-      });
-
-      setCalculatedCost(calcResponse.data);
-      setActionPromptQuote(null);
-      
-      // Navigate to Workspace
-      setActiveTab('calculator');
-    } catch (err) {
-      alert('Imported parameters but calculator calculation failed: ' + (err.response?.data?.error || err.message));
-      setActionPromptQuote(null);
-      setActiveTab('calculator');
     } finally {
       setActionLoading(false);
     }
@@ -525,6 +426,12 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
         )}
       </div>
 
+      {successMsg && (
+        <div className={`border-l-4 p-4 mb-6 rounded text-sm ${isDark ? 'bg-emerald-950/40 border-emerald-500 text-emerald-300' : 'bg-emerald-50 border-emerald-500 text-emerald-800'}`}>
+          ✅ {successMsg}
+        </div>
+      )}
+
       {error && (
         <div className={`border-l-4 p-4 mb-6 rounded text-sm ${isDark ? 'bg-red-950/30 border-red-500 text-red-300' : 'bg-red-50 border-red-500 text-red-700'}`}>
           ❌ {error}
@@ -543,7 +450,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
         </div>
       ) : (
         <>
-          {/* Compilation Action Banner when quotes are selected */}
+          {/* Compilation & Bulk Action Banner when quotes are selected */}
           {(() => {
             if (selectedQuoteIds.length === 0) return null;
             const selList = quotes.filter(q => selectedQuoteIds.includes(q.id));
@@ -552,47 +459,60 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
             const hasVat = selList.some(q => !q.tax_type || !q.tax_type.includes('Non-VAT'));
             const hasNonVat = selList.some(q => q.tax_type && q.tax_type.includes('Non-VAT'));
             const hasMixedTax = hasVat && hasNonVat;
-            const isInvalid = hasMultipleCustomers || hasMixedTax;
+            const isInvalidForCompile = hasMultipleCustomers || hasMixedTax;
 
             return (
               <div className={`p-4 mb-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border shadow-md animate-fade-in ${
-                isInvalid
-                  ? isDark ? 'bg-red-950/40 border-red-800/60 text-red-200' : 'bg-red-50 border-red-300 text-red-900'
+                isInvalidForCompile
+                  ? isDark ? 'bg-slate-900/90 border-slate-700 text-slate-200' : 'bg-amber-50/80 border-amber-300 text-amber-950'
                   : isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-900'
               }`}>
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2 font-bold text-sm">
-                    <span>{isInvalid ? '⚠️' : '☑️'}</span>
-                    <span>{selectedQuoteIds.length} quote(s) selected for compilation</span>
-                    {!isInvalid && custs.length === 1 && (
+                    <span>☑️</span>
+                    <span>{selectedQuoteIds.length} quote(s) selected</span>
+                    {!isInvalidForCompile && custs.length === 1 && (
                       <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                         {custs[0]} ({hasNonVat ? 'Non-VAT' : 'VAT'})
                       </span>
                     )}
                   </div>
                   {hasMultipleCustomers && (
-                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">
-                      ❌ Selected quotes belong to different customers ({custs.join(', ')}). All must belong to the same customer.
+                    <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      ℹ️ Selected quotes belong to multiple customers ({custs.join(', ')}). Compilation is disabled, but Admin group deletion is allowed.
                     </p>
                   )}
                   {hasMixedTax && (
-                    <p className="text-xs font-semibold text-red-600 dark:text-red-400">
-                      ❌ Selected quotes mix VAT and Non-VAT. All must have the same tax format.
+                    <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      ℹ️ Selected quotes mix VAT and Non-VAT. Compilation is disabled, but Admin group deletion is allowed.
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
+                    disabled={isInvalidForCompile}
                     onClick={handleCompileSelected}
-                    className={`px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md cursor-pointer transition ${
-                      isInvalid 
-                        ? 'bg-gray-400 text-gray-200 dark:bg-slate-700 dark:text-slate-400 hover:opacity-90' 
-                        : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white hover:scale-[1.02]'
+                    className={`px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md transition ${
+                      isInvalidForCompile 
+                        ? 'bg-gray-300 text-gray-500 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed opacity-60' 
+                        : 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white hover:scale-[1.02] cursor-pointer'
                     }`}
+                    title={isInvalidForCompile ? "All compiled quotes must share the same customer and tax format" : "Compile selected into one official quotation document"}
                   >
-                    📑 Compile Selected ({selectedQuoteIds.length}) into One Quotation
+                    📑 Compile Selected ({selectedQuoteIds.length})
                   </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      disabled={bulkDeleteLoading}
+                      onClick={handleBulkDelete}
+                      className="px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow-md bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white hover:scale-[1.02] cursor-pointer transition disabled:opacity-50"
+                      title="Permanently delete all selected quotations (Admin only)"
+                    >
+                      {bulkDeleteLoading ? 'Deleting...' : `🗑️ Delete Selected (${selectedQuoteIds.length})`}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setSelectedQuoteIds([])}
@@ -663,7 +583,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                 {filteredQuotes.map((quote) => (
                   <tr
                     key={quote.id}
-                    onClick={() => handleRowClick(quote.id)}
+                    onClick={() => handleViewQuote(quote.id)}
                     className={`transition cursor-pointer ${
                       selectedQuoteIds.includes(quote.id)
                         ? isDark ? 'bg-[#d4af37]/15' : 'bg-amber-50'
@@ -786,14 +706,15 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-right text-xs font-medium space-x-2" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => handleRowClick(quote.id)}
+                        onClick={() => handleViewQuote(quote.id)}
                         className={`font-semibold px-3 py-1.5 rounded-lg border transition cursor-pointer ${
                           isDark 
                             ? 'text-[#d4af37] bg-[#d4af37]/10 hover:bg-[#d4af37]/20 border-[#c5a880]/30' 
                             : 'text-[#8c734b] bg-[#faf8f5] border-[#dfd5bc] hover:bg-[#eae5d9]/40'
                         }`}
+                        title="View official quotation breakdown and print options"
                       >
-                        Open Options
+                        📄 View Quotation
                       </button>
                       {canDelete && (
                         <button
@@ -813,74 +734,6 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
         </>
       )}
       </div>
-
-      {/* CHOICE PROMPT MODAL */}
-      {actionPromptQuote && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
-          <div className={`rounded-3xl shadow-2xl max-w-md w-full p-5 sm:p-6 relative border max-h-[90vh] flex flex-col overflow-y-auto ${
-            isDark ? 'bg-[#0f141e] text-white border-[#c5a880]/30' : 'bg-[#fcfaf7] text-[#5c4c36] border-[#dfd5bc]'
-          }`}>
-            <button
-              onClick={() => setActionPromptQuote(null)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-black dark:text-gray-300 dark:hover:text-white text-xl font-bold cursor-pointer"
-            >
-              ✕
-            </button>
-            <h3 className={`text-lg font-black mb-2 ${isDark ? 'text-[#f5deb3]' : 'text-[#1a130b]'}`}>
-              Quote Choices ({actionPromptQuote.quote_no || `QT-${String(actionPromptQuote.id).padStart(5, '0')}`})
-            </h3>
-            <p className={`text-sm mb-6 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
-              Would you like to view the detailed summary break-down for <strong>{actionPromptQuote.customer_name}</strong> or load its data into the active calculation workspace for editing?
-            </p>
-
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setSelectedQuote(actionPromptQuote);
-                  setActionPromptQuote(null);
-                }}
-                style={{
-                  backgroundColor: isDark ? '#d4af37' : '#8c734b',
-                  color: isDark ? '#0f172a' : '#ffffff'
-                }}
-                className={`w-full font-bold py-3 rounded-2xl shadow-md transition block text-sm text-center cursor-pointer hover:scale-[1.01] ${
-                  isDark 
-                    ? 'bg-[#d4af37] text-[#0f172a] bg-gradient-to-r from-[#d4af37] to-[#aa841e] hover:from-[#e5c158] hover:to-[#c2982c]' 
-                    : 'bg-[#8c734b] text-white bg-gradient-to-r from-[#8c734b] to-[#5c4c36] hover:from-[#9f8150] hover:to-[#7a6442]'
-                }`}
-              >
-                🔍 View Costing Summary Modal
-              </button>
-              <button
-                onClick={() => handleLoadToWorkspace(actionPromptQuote)}
-                className={`w-full font-bold py-3 rounded-2xl transition block text-sm text-center cursor-pointer hover:scale-[1.01] border ${
-                  isDark 
-                    ? 'bg-[#1a2332] text-white hover:bg-slate-700 border-[#c5a880]/30' 
-                    : 'bg-[#faf8f5] hover:bg-[#eae5d9]/40 text-[#5c4c36] border-[#dfd5bc]'
-                }`}
-              >
-                💻 Load Costing Data to Workspace (Edit)
-              </button>
-              {canDelete && (
-                <button
-                  onClick={() => handleDeleteQuote(actionPromptQuote.id, actionPromptQuote.quote_no)}
-                  className="w-full font-bold py-2.5 rounded-2xl transition block text-sm text-center cursor-pointer hover:scale-[1.01] border text-red-600 bg-red-50 hover:bg-red-100 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60"
-                >
-                  🗑️ Delete Quote
-                </button>
-              )}
-              <button
-                onClick={() => setActionPromptQuote(null)}
-                className={`w-full font-semibold py-2.5 rounded-2xl transition block text-xs text-center cursor-pointer border ${
-                  isDark ? 'bg-slate-900 text-slate-400 hover:bg-slate-950' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* DETAIL MODAL - OFFICIAL QUOTATION REPORT */}
       {selectedQuote && (
