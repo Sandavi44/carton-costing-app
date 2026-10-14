@@ -540,6 +540,35 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
     }
   };
 
+  const handleScrollToOverwrite = () => {
+    const overwriteBtn = document.getElementById('overwrite-quote-btn');
+    if (overwriteBtn) {
+      overwriteBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      overwriteBtn.classList.add('ring-4', 'ring-amber-400', 'scale-105');
+      setTimeout(() => {
+        overwriteBtn.classList.remove('ring-4', 'ring-amber-400', 'scale-105');
+      }, 2000);
+      return;
+    }
+    const middleSaveBtn = document.getElementById('middle-save-btn');
+    if (middleSaveBtn) {
+      middleSaveBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      middleSaveBtn.classList.add('ring-4', 'ring-amber-400', 'scale-105');
+      setTimeout(() => {
+        middleSaveBtn.classList.remove('ring-4', 'ring-amber-400', 'scale-105');
+      }, 2000);
+      return;
+    }
+    const calcBtn = document.getElementById('calculate-cost-btn');
+    if (calcBtn) {
+      calcBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      calcBtn.classList.add('ring-4', 'ring-amber-400', 'scale-105');
+      setTimeout(() => {
+        calcBtn.classList.remove('ring-4', 'ring-amber-400', 'scale-105');
+      }, 2000);
+    }
+  };
+
   // Convert input dimension value to mm rounded to nearest whole mm for all internal formulas and database persistence
   const toMM = (val) => {
     if (!val || isNaN(val) || String(val).trim() === '') return 0;
@@ -1353,15 +1382,20 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         </h2>
         {isCustomerNameOnlyEdit ? (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`px-4 py-1.5 rounded-full text-sm font-extrabold tracking-wide border shadow-xs ${
-              isDark 
-                ? 'bg-amber-950/60 text-[#d4af37] border-[#d4af37]/40' 
-                : isSand
-                  ? 'bg-[#f5ebd7] text-[#8c734b] border-[#8c734b]/40'
-                  : 'bg-amber-100/80 text-[#8c734b] border-[#8c734b]/40'
-            }`}>
-              ✏️ Editing: {formData.quoteNo || activeQuoteNo}
-            </span>
+            <button
+              type="button"
+              onClick={handleScrollToOverwrite}
+              className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-extrabold tracking-wide border shadow-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5 ${
+                isDark 
+                  ? 'bg-amber-950/60 text-[#d4af37] border-[#d4af37]/40 hover:bg-amber-900/60' 
+                  : isSand
+                    ? 'bg-[#f5ebd7] text-[#8c734b] border-[#8c734b]/40 hover:bg-[#eedfc4]'
+                    : 'bg-amber-100/80 text-[#8c734b] border-[#8c734b]/40 hover:bg-amber-200'
+              }`}
+              title="Click to scroll down directly to Save & Overwrite button"
+            >
+              <span>✏️</span> Editing: <span className="underline font-black">{formData.quoteNo || activeQuoteNo}</span> (Click to Save ↓)
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -1381,15 +1415,20 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
           </div>
         ) : activeQuoteNo ? (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`px-4 py-1.5 rounded-full text-sm font-extrabold tracking-wide border shadow-xs ${
-              isDark 
-                ? 'bg-amber-950/60 text-[#d4af37] border-[#d4af37]/40' 
-                : isSand
-                  ? 'bg-[#f5ebd7] text-[#8c734b] border-[#8c734b]/40'
-                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-            }`}>
-              💾 Working Quote: {activeQuoteNo} (In-Session Overwrite Active)
-            </span>
+            <button
+              type="button"
+              onClick={handleScrollToOverwrite}
+              className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-extrabold tracking-wide border shadow-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5 ${
+                isDark 
+                  ? 'bg-amber-950/60 text-[#d4af37] border-[#d4af37]/40 hover:bg-amber-900/60' 
+                  : isSand
+                    ? 'bg-[#f5ebd7] text-[#8c734b] border-[#8c734b]/40 hover:bg-[#eedfc4]'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+              }`}
+              title={`Click to scroll down directly to Update & Overwrite (${activeQuoteNo}) button`}
+            >
+              <span>💾</span> Working Quote: <span className="underline font-black">{activeQuoteNo}</span> (Click to Overwrite ↓)
+            </button>
             <button
               type="button"
               onClick={handleStartNewQuote}
@@ -2420,6 +2459,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <button
+              id="middle-save-btn"
               type="button"
               onClick={handleSaveCustomerNameOnly}
               disabled={loading}
@@ -2441,6 +2481,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
         </div>
       ) : (
         <button
+          id="calculate-cost-btn"
           type="button"
           onClick={calculateCost}
           disabled={loading}
@@ -2629,6 +2670,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
               {isCustomerNameOnlyEdit ? (
                 <>
                   <button
+                    id="overwrite-quote-btn"
                     type="button"
                     onClick={handleSaveCustomerNameOnly}
                     disabled={loading}
@@ -2674,6 +2716,7 @@ export default function CostingApp({ user, formData, setFormData, calculatedCost
                   {activeQuoteId ? (
                     <>
                       <button
+                        id="overwrite-quote-btn"
                         type="button"
                         onClick={saveQuote}
                         className="font-black py-3 px-5 rounded-2xl border transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 border-amber-300 shadow-md"
