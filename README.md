@@ -22,14 +22,15 @@ Then open your browser: **http://localhost**
 > The first build takes ~2–3 minutes to download images and install dependencies.
 > Subsequent starts use cached layers and launch in seconds.
 
-### Default Login Credentials
-| Role | Username | Password | Access Privileges |
-|------|----------|----------|-------------------|
-| **Admin** | `Admin` | `Costing@1970` | Full administrative control, system parameters, bulk delete, customer editing |
-| **Estimator** | `Manoj` | `Mano@789` | Standard carton costing calculation, quotation saving, and PDF generation |
-| **Estimator** | `Kaushalya` | `Kaushi@789` | Standard carton costing calculation, quotation saving, and PDF generation |
+### 👤 Access Roles & Security
+The platform implements strict Role-Based Access Control (RBAC):
 
-*(User passwords can be redefined inside the application via the Change Password modal).*
+| Role | Access Privileges | Description |
+|------|-------------------|-------------|
+| **Admin** | Full Control | System parameters, pricing margins, bulk quotation deletion, customer record management |
+| **Estimator** | Quoting & PDF Export | Multi-variable carton costing, quote saving, historical reload, customer PDF generation |
+
+> 🔒 **Security Notice:** Production credentials for active factory accounts are strictly protected. Interviewers and technical evaluators requesting live demo access or a walkthrough may contact the author via LinkedIn or email.
 
 ---
 
