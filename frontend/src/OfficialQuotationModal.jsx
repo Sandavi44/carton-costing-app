@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function OfficialQuotationModal({ quote, user, onClose, onDelete, theme = 'green' }) {
+export default function OfficialQuotationModal({ quote, user, onClose, onDelete, onViewCalculationLogic, theme = 'green' }) {
   const [reportTaxFormat, setReportTaxFormat] = useState('auto');
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
@@ -715,6 +715,25 @@ export default function OfficialQuotationModal({ quote, user, onClose, onDelete,
               </>
             )}
           </button>
+          {onViewCalculationLogic && (
+            <button
+              type="button"
+              onClick={() => {
+                cleanOverlays();
+                onClose();
+                onViewCalculationLogic();
+              }}
+              style={{
+                backgroundColor: '#7c3aed',
+                color: '#ffffff',
+                borderColor: '#6d28d9'
+              }}
+              className="font-black py-2.5 sm:py-3 rounded-2xl border transition cursor-pointer shadow-md text-xs sm:text-sm flex items-center justify-center gap-1.5 hover:opacity-90 hover:scale-[1.01]"
+              title="Inspect complete step-by-step mathematical logic and working sheet for this quotation"
+            >
+              <span>📐</span> View Calculation Logic
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {

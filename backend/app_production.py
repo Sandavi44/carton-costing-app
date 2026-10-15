@@ -946,6 +946,151 @@ def get_quote(quote_id):
             type_str = carton_type if 'type' in carton_type.lower() else f"{carton_type} Type"
             main_desc = f"{dim_display} - {ply_clean} {product_noun} - {type_str}"
 
+        calculated_cost = None
+        if items_list and isinstance(items_list, list) and len(items_list) > 0 and isinstance(items_list[0], dict):
+            calculated_cost = items_list[0].get('calculated_cost')
+
+        if not calculated_cost or not isinstance(calculated_cost, dict) or 'per_carton_costs' not in calculated_cost:
+            try:
+                sscl_param = SystemParameter.query.filter_by(parameter_name='sscl_rate').first()
+                sscl_rate = safe_float(sscl_param.value) if sscl_param else 2.125
+                vat_param = SystemParameter.query.filter_by(parameter_name='vat_rate').first()
+                vat_rate = safe_float(vat_param.value) if vat_param else 18.0
+                input_tax_param = SystemParameter.query.filter_by(parameter_name='input_tax_rate').first()
+                input_tax_rate = safe_float(input_tax_param.value) if input_tax_param else 18.0
+                inhouse_waste_param = SystemParameter.query.filter_by(parameter_name='inhouse_waste_percent').first() or SystemParameter.query.filter_by(parameter_name='waste_allowance_percent').first()
+                inhouse_waste_rate = safe_float(inhouse_waste_param.value) if inhouse_waste_param else 5.0
+                outsource_waste_param = SystemParameter.query.filter_by(parameter_name='outsource_waste_percent').first()
+                outsource_waste_rate = safe_float(outsource_waste_param.value) if outsource_waste_param else 3.0
+                outsource_sf_waste_param = SystemParameter.query.filter_by(parameter_name='outsource_sf_waste_percent').first()
+                outsource_sf_waste_rate = safe_float(outsource_sf_waste_param.value) if outsource_sf_waste_param else 1.0
+
+                glued_s_param = SystemParameter.query.filter_by(parameter_name='joining_cost_glued_s').first()
+                default_glued_s = safe_float(glued_s_param.value) if glued_s_param else 3.00
+                glued_m_param = SystemParameter.query.filter_by(parameter_name='joining_cost_glued_m').first()
+                default_glued_m = safe_float(glued_m_param.value) if glued_m_param else 4.50
+                glued_l_param = SystemParameter.query.filter_by(parameter_name='joining_cost_glued_l').first()
+                default_glued_l = safe_float(glued_l_param.value) if glued_l_param else 6.00
+
+                parsed_gsm = json.loads(quote.gsm_values) if quote.gsm_values else []
+                is_white_b = ('white' in (quote.board_type or '').lower())
+                calc_params = CostingParameters(
+                    carton_length_mm=round(safe_float(quote.carton_length_mm)),
+                    carton_width_mm=round(safe_float(quote.carton_width_mm)),
+                    carton_height_mm=round(safe_float(quote.carton_height_mm)),
+                    quantity=safe_int(quote.quantity),
+                    ply_type=quote.ply_type or '3-Ply',
+                    board_type='Whitecut' if is_white_b else 'Browncut',
+                    flute_type=quote.flute_type or 'B-Flute',
+                    flute_type_2=quote.flute_type_2 or quote.flute_type or 'B-Flute',
+                    production_method=quote.production_method or 'In-house',
+                    carton_type=quote.carton_type or 'RSC',
+                    die_length_mm=round(safe_float(quote.die_length_mm or 0)),
+                    die_width_mm=round(safe_float(quote.die_width_mm or 0)),
+                    inhouse_waste_percent=inhouse_waste_rate,
+                    outsource_waste_percent=outsource_waste_rate,
+                    outsource_sf_waste_percent=outsource_sf_waste_rate,
+                    joining_type=quote.joining_type or 'Glued',
+                    is_printed=bool(quote.is_printed),
+                    white_liner_rate=safe_float(quote.white_liner_rate),
+                    brown_liner_rate=safe_float(quote.brown_liner_rate),
+                    gsm_values=[safe_float(g) for g in parsed_gsm],
+                    total_overhead_for_order=safe_float(quote.total_overhead_for_order),
+                    joining_cost=safe_float(quote.joining_cost),
+                    print_cost=safe_float(quote.print_cost),
+                    slotting_cost=safe_float(quote.slotting_cost),
+                    bundling_cost=safe_float(quote.bundling_cost),
+                    diecutting_cost=safe_float(quote.diecutting_cost),
+                    profit_margin_percent=safe_float(quote.profit_margin_percent, 15),
+                    tax_type=quote.tax_type or 'Non-VAT, Inhouse',
+                    sscl_rate=sscl_rate,
+                    vat_rate=vat_rate,
+                    input_tax_rate=input_tax_rate,
+                    has_inhouse_commission=bool(quote.has_inhouse_commission),
+                    has_third_party_commission=bool(quote.has_third_party_commission),
+                    third_party_commission=safe_float(quote.third_party_commission),
+                    has_transport=bool(quote.has_transport),
+                    transport_cost=safe_float(quote.transport_cost),
+                    joining_cost_glued_s=default_glued_s,
+                    joining_cost_glued_m=default_glued_m,
+                    joining_cost_glued_l=default_glued_l,
+                )
+                calc_engine = CostingCalculator(calc_params)
+                calculated_cost = calc_engine.calculate()
+            except Exception:
+                is_white_b = ('white' in (quote.board_type or '').lower())
+                calculated_cost = {
+                    'sheet_dimensions': {
+                        'sheet_length_mm': quote.sheet_length_mm or 0,
+                        'sheet_width_mm': quote.sheet_width_mm or 0,
+                        'board_area_m2': quote.board_area_m2 or 0,
+                        'selected_reel_mm': quote.selected_reel_mm or 0,
+                        'sheets_per_reel': quote.sheets_per_reel or 0,
+                        'reel_waste_mm': quote.reel_waste_mm or 0,
+                        'is_two_up': False
+                    },
+                    'material': {
+                        'total_gsm': quote.total_gsm or 0,
+                        'weight_per_sheet_kg': quote.weight_per_sheet_kg or 0,
+                        'waste_allowance_percent': 5.0,
+                        'flute_type': quote.flute_type or 'B-Flute',
+                        'flute_type_2': quote.flute_type_2 or quote.flute_type or 'B-Flute',
+                    },
+                    'rates': {
+                        'rate_per_kg': quote.white_liner_rate if is_white_b else (quote.brown_liner_rate or 260),
+                        'rm_cost_before_sscl': quote.rm_cost_per_carton or 0,
+                        'sscl_rate': 2.125,
+                        'sscl_on_rm': 0,
+                        'input_tax_rate': 18.0,
+                        'input_tax_on_rm': 0,
+                        'vat_rate': 18.0,
+                        'rm_cost_with_sscl': quote.rm_cost_per_carton or 0,
+                        'rm_cost_per_carton': quote.rm_cost_per_carton or 0,
+                    },
+                    'per_carton_costs': {
+                        'overhead': quote.overhead_per_carton or 0,
+                        'joining': quote.joining_cost or 0,
+                        'print': quote.print_cost or 0,
+                        'slotting': quote.slotting_cost or 0,
+                        'bundling': quote.bundling_cost or 0,
+                        'diecutting': quote.diecutting_cost or 0,
+                        'subtotal': quote.subtotal_per_carton or 0,
+                    },
+                    'profit': {
+                        'profit_amount': quote.profit_per_carton or 0,
+                        'cost_with_profit': quote.cost_with_profit_per_carton or ((quote.subtotal_per_carton or 0) + (quote.profit_per_carton or 0)),
+                    },
+                    'commissions': {
+                        'has_inhouse_commission': bool(quote.has_inhouse_commission),
+                        'inhouse_commission': 0,
+                        'cost_after_inhouse': quote.cost_with_profit_per_carton or 0,
+                        'has_third_party_commission': bool(quote.has_third_party_commission),
+                        'third_party_commission': quote.third_party_commission or 0,
+                        'cost_after_commissions': quote.cost_with_profit_per_carton or 0,
+                    },
+                    'transport': {
+                        'has_transport': bool(quote.has_transport),
+                        'transport_cost': quote.transport_cost or 0,
+                        'transport_per_carton': quote.transport_per_carton or 0,
+                    },
+                    'tax': {
+                        'tax_type': quote.tax_type or 'Non-VAT',
+                        'tax_amount_per_carton': quote.tax_amount_per_carton or 0,
+                    },
+                    'final': {
+                        'final_cost_per_carton': quote.final_cost_per_carton or 0,
+                        'total_cost_batch': quote.total_cost_batch or 0,
+                    },
+                    'dimensions': {
+                        'carton_length_mm': quote.carton_length_mm or 0,
+                        'carton_width_mm': quote.carton_width_mm or 0,
+                        'carton_height_mm': quote.carton_height_mm or 0,
+                        'die_length_mm': quote.die_length_mm or 0,
+                        'die_width_mm': quote.die_width_mm or 0,
+                        'carton_type': quote.carton_type or 'RSC',
+                    }
+                }
+
         return jsonify({
             'id': quote.id,
             'quote_no': f"QT-{str(quote.id).zfill(5)}",
@@ -953,6 +1098,7 @@ def get_quote(quote_id):
             'originator_name': originator_name,
             'prepared_by': originator_name,
             'created_by': originator_name,
+            'calculated_cost': calculated_cost,
             'description': main_desc,
             'item_description': main_desc,
             'dimensions_display': dim_display,

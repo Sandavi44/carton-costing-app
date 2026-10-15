@@ -1,26 +1,195 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
-export default function CalculationSteps({ formData, calculatedCost, theme }) {
+export default function CalculationSteps({ formData, setFormData, calculatedCost, setCalculatedCost, setActiveTab, theme }) {
   const isDark = theme === 'dark';
   const isSand = theme === 'sand';
   const isGreen = !isDark && !isSand;
 
+  const [historyQuotes, setHistoryQuotes] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingSelected, setLoadingSelected] = useState(false);
+
+  useEffect(() => {
+    if (!calculatedCost) {
+      setLoadingHistory(true);
+      axios.get('/api/quotes', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+      })
+      .then(res => setHistoryQuotes(res.data || []))
+      .catch(() => {})
+      .finally(() => setLoadingHistory(false));
+    }
+  }, [calculatedCost]);
+
+  const handleSelectHistoryQuote = async (quoteId) => {
+    if (!setFormData || !setCalculatedCost) return;
+    setLoadingSelected(true);
+    try {
+      const response = await axios.get(`/api/quotes/${quoteId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      const q = response.data;
+      const gsmArray = q.gsm_values || [];
+
+      setFormData({
+        customerName: q.customer_name || '',
+        cartonLength: q.dimensions?.length_mm || q.carton_length_mm || '',
+        cartonWidth: q.dimensions?.width_mm || q.carton_width_mm || '',
+        cartonHeight: q.dimensions?.height_mm || q.carton_height_mm || '',
+        quantity: q.quantity || '',
+        plyType: q.ply_type || '3-Ply',
+        boardType: (q.board_type && q.board_type.toLowerCase().includes('white')) ? 'White Liner' : 'Brown Liner',
+        fluteType: q.flute_type || 'B-Flute',
+        fluteType2: q.flute_type_2 || q.flute_type || 'B-Flute',
+        productionMethod: q.production_method || 'In-house',
+        cartonType: q.carton_type || 'RSC',
+        dieLength: q.die_length_mm ? String(q.die_length_mm) : '',
+        dieWidth: q.die_width_mm ? String(q.die_width_mm) : '',
+        quoteNo: q.quote_no || `QT-${String(q.id).padStart(5, '0')}`,
+        isEditing: false,
+        isCustomerNameOnlyEdit: false,
+        editQuoteId: q.id,
+        joiningType: q.joining_type || 'Glued',
+        isPrinted: q.is_printed || false,
+        printName: q.print_name || '',
+        whiteLinerRate: q.white_liner_rate ? String(q.white_liner_rate) : '',
+        brownLinerRate: q.brown_liner_rate ? String(q.brown_liner_rate) : '',
+        gsm1: gsmArray[0] !== undefined ? String(gsmArray[0]) : '',
+        gsm2: gsmArray[1] !== undefined ? String(gsmArray[1]) : '',
+        gsm3: gsmArray[2] !== undefined ? String(gsmArray[2]) : '',
+        gsm4: gsmArray[3] !== undefined ? String(gsmArray[3]) : '',
+        gsm5: gsmArray[4] !== undefined ? String(gsmArray[4]) : '',
+        gsm6: gsmArray[5] !== undefined ? String(gsmArray[5]) : '',
+        gsm7: gsmArray[6] !== undefined ? String(gsmArray[6]) : '',
+        totalOverheadForOrder: q.total_overhead_for_order !== undefined ? String(q.total_overhead_for_order) : '',
+        joiningCost: q.joining_cost !== undefined ? String(q.joining_cost) : '',
+        printCost: q.print_cost !== undefined ? String(q.print_cost) : '',
+        slottingCost: q.slotting_cost !== undefined ? String(q.slotting_cost) : '',
+        bundlingCost: q.bundling_cost !== undefined ? String(q.bundling_cost) : '',
+        diecuttingCost: q.diecutting_cost !== undefined ? String(q.diecutting_cost) : '',
+        profitMargin: q.profit_margin_percent !== undefined ? String(q.profit_margin_percent) : '15',
+        taxType: q.tax_type?.includes('VAT') && !q.tax_type?.includes('Non-VAT') ? 'VAT' : 'Non-VAT',
+        hasInhouseCommission: q.has_inhouse_commission || false,
+        hasThirdPartyCommission: q.has_third_party_commission || false,
+        thirdPartyCommission: q.third_party_commission !== undefined ? String(q.third_party_commission) : '',
+        hasTransport: q.has_transport || false,
+        transportCost: q.transport_cost !== undefined ? String(q.transport_cost) : '',
+        transportOption: q.transport_option || (q.has_transport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
+        oneTimeDieCost: q.die_making_cost ? String(q.die_making_cost) : '',
+        oneTimeBlockCost: q.block_making_cost ? String(q.block_making_cost) : '',
+        oneTimeTransportCost: q.one_time_transport_cost ? String(q.one_time_transport_cost) : '',
+        paymentMethod: q.payment_method || 'Credit - 30 Days',
+        dimensionUnit: q.dimension_unit || 'mm',
+      });
+
+      if (q.calculated_cost) {
+        setCalculatedCost(q.calculated_cost);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to load quotation calculation');
+    } finally {
+      setLoadingSelected(false);
+    }
+  };
+
   if (!calculatedCost) {
     return (
-      <div className={`rounded-2xl shadow-xl p-8 text-center border ${
+      <div className={`rounded-3xl shadow-xl p-6 sm:p-8 max-w-4xl mx-auto text-left border ${
         isDark 
           ? 'bg-slate-800 text-white border-slate-700' 
           : isSand
             ? 'bg-[#faf8f5] text-[#5c4c36] border-[#dfd5bc]'
             : 'bg-[#eaf5ea] text-[#14532d] border-[#bbf7d0]'
       }`}>
-        <h2 className="text-2xl font-bold mb-4">🧮 Calculation Logic & Steps</h2>
-        <div className="max-w-md mx-auto py-8">
-          <span className="text-5xl">💡</span>
-          <p className={`mt-4 font-medium ${isDark ? 'text-slate-400' : isSand ? 'text-[#8c734b]' : 'text-[#166534]'}`}>
-            Please perform a calculation in the <strong>Calculator</strong> tab first. 
-            Once calculated, this tab will show a live step-by-step solver substituting your inputs into all the equations.
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 mb-6 border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">📐</span>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black">Calculation Logic & Working Sheet</h2>
+              <p className="text-xs opacity-75 font-medium">Inspect live step-by-step mathematical solver substituting inputs into formulas</p>
+            </div>
+          </div>
+          {setActiveTab && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('calculator')}
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs"
+            >
+              🧮 Go to Calculator
+            </button>
+          )}
+        </div>
+
+        <div className={`p-4 rounded-2xl mb-6 border ${
+          isDark ? 'bg-slate-900/60 border-slate-700 text-slate-300' : isSand ? 'bg-white border-[#dfd5bc] text-[#5c4c36]' : 'bg-white border-[#bbf7d0] text-[#166534]'
+        }`}>
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">💡</span>
+            <div>
+              <p className="font-bold text-sm">No live calculation currently in memory.</p>
+              <p className="text-xs opacity-80 mt-1">
+                You can calculate a carton in the <strong>Calculator tab</strong>, or pick any existing saved quotation from the history list below to inspect its full mathematical derivation:
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Saved Quotation Selector List */}
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-wider mb-3 flex items-center gap-2">
+            <span>📜</span> Select a Quotation to View Its Calculation Logic:
+          </h3>
+
+          {loadingHistory || loadingSelected ? (
+            <div className="py-8 text-center text-sm font-bold opacity-75 animate-pulse">
+              {loadingSelected ? 'Loading full mathematical working sheet...' : 'Fetching historical quotations...'}
+            </div>
+          ) : historyQuotes.length === 0 ? (
+            <div className="py-8 text-center border-2 border-dashed rounded-2xl opacity-60 text-xs">
+              No saved quotations found in database. Please create a quotation in the Calculator tab first.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+              {historyQuotes.map(q => (
+                <div
+                  key={q.id}
+                  onClick={() => handleSelectHistoryQuote(q.id)}
+                  className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-wrap items-center justify-between gap-3 hover:scale-[1.01] ${
+                    isDark 
+                      ? 'bg-slate-900/40 border-slate-700/80 hover:bg-purple-950/30 hover:border-purple-500/50' 
+                      : isSand 
+                        ? 'bg-white border-[#dfd5bc] hover:border-[#8c734b] hover:bg-[#faf6ee]' 
+                        : 'bg-white border-emerald-200 hover:border-emerald-500 hover:bg-emerald-50/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-black border ${
+                      isDark ? 'bg-purple-950/60 border-purple-500/50 text-purple-300' : 'bg-purple-100 border-purple-300 text-purple-800'
+                    }`}>
+                      {q.quote_no || `QT-${String(q.id).padStart(5, '0')}`}
+                    </span>
+                    <div>
+                      <div className="font-extrabold text-sm">{q.customer_name}</div>
+                      <div className="text-xs opacity-75">
+                        {q.ply_type} • {q.carton_type || 'RSC'} • Qty: {q.quantity} • Rs. {q.final_cost_per_carton} / carton
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectHistoryQuote(q.id);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer flex items-center gap-1 shadow-xs"
+                  >
+                    <span>📐</span> View Logic
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -168,15 +337,64 @@ export default function CalculationSteps({ formData, calculatedCost, theme }) {
           ? 'bg-[#fcfaf7] text-[#5c4c36] border-[#dfd5bc]'
           : 'bg-[#f4faf4] text-[#14532d] border-[#bbf7d0]'
     }`}>
-      <h2 className={`text-2xl font-bold mb-6 border-b pb-4 flex items-center gap-2 ${
-        isDark 
-          ? 'border-slate-700 text-[#d4af37]' 
-          : isSand
-            ? 'border-[#dfd5bc] text-[#8c734b]'
-            : 'border-[#bbf7d0] text-[#14532d]'
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 mb-6 border-gray-200 dark:border-slate-700">
+        <h2 className={`text-2xl font-bold flex items-center gap-2 ${
+          isDark 
+            ? 'text-[#d4af37]' 
+            : isSand
+              ? 'text-[#8c734b]'
+              : 'text-[#14532d]'
+        }`}>
+          <span>🧮</span> Live Costing Step-by-Step Solver
+        </h2>
+        <div className="flex items-center gap-2">
+          {setActiveTab && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer bg-white/80 dark:bg-slate-800 text-gray-800 dark:text-gray-200 hover:opacity-80 shadow-2xs"
+            >
+              📜 Quote History
+            </button>
+          )}
+          {setActiveTab && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('calculator')}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700 shadow-2xs"
+            >
+              🧮 Open in Calculator
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Active Quotation Context Bar */}
+      <div className={`p-4 rounded-2xl mb-6 border flex flex-wrap items-center justify-between gap-3 shadow-xs ${
+        isDark ? 'bg-purple-950/40 border-purple-800/50 text-purple-200' : 'bg-purple-50 border-purple-200 text-purple-950'
       }`}>
-        <span>🧮</span> Live Costing Step-by-Step Solver
-      </h2>
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">📜</span>
+          <div>
+            <div className="font-extrabold text-sm sm:text-base flex items-center gap-2">
+              <span>{formData.quoteNo ? `Working Sheet for ${formData.quoteNo}` : 'Live Calculation Working Sheet'}</span>
+              {formData.customerName && (
+                <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                  isDark ? 'bg-purple-900/60 border-purple-400/40 text-purple-200' : 'bg-purple-200/80 border-purple-400 text-purple-900'
+                }`}>
+                  {formData.customerName}
+                </span>
+              )}
+            </div>
+            <p className="text-xs opacity-80 mt-0.5 font-medium">
+              Carton: {formData.cartonLength || L} × {formData.cartonWidth || W} × {formData.cartonHeight || H} mm • {ply} • {cartonType} • Qty: {Qty.toLocaleString()}
+            </p>
+          </div>
+        </div>
+        <div className="text-xs font-bold font-mono">
+          Final: Rs. {parseFloat(calculatedCost?.final?.final_cost_per_carton || 0).toFixed(2)} / carton
+        </div>
+      </div>
 
       <div className="space-y-8">
         {/* PHASE 1 */}

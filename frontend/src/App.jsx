@@ -341,14 +341,19 @@ function App() {
         {activeTab === 'steps' && (
           <CalculationSteps 
             formData={formData} 
+            setFormData={setFormData}
             calculatedCost={calculatedCost} 
+            setCalculatedCost={setCalculatedCost}
+            setActiveTab={setActiveTab}
             theme={theme}
           />
         )}
         {activeTab === 'history' && (
           <QuoteHistory 
             user={user}
+            formData={formData}
             setFormData={setFormData} 
+            calculatedCost={calculatedCost}
             setCalculatedCost={setCalculatedCost} 
             setActiveTab={setActiveTab} 
             theme={theme}

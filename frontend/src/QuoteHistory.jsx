@@ -161,6 +161,65 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
     }
   };
 
+  const populateQuoteIntoState = (q, forEdit = false) => {
+    const gsmArray = q.gsm_values || [];
+
+    setFormData({
+      customerName: q.customer_name || '',
+      cartonLength: q.dimensions?.length_mm || q.carton_length_mm || '',
+      cartonWidth: q.dimensions?.width_mm || q.carton_width_mm || '',
+      cartonHeight: q.dimensions?.height_mm || q.carton_height_mm || '',
+      quantity: q.quantity || '',
+      plyType: q.ply_type || '3-Ply',
+      boardType: (q.board_type && q.board_type.toLowerCase().includes('white')) ? 'White Liner' : 'Brown Liner',
+      fluteType: q.flute_type || 'B-Flute',
+      fluteType2: q.flute_type_2 || q.flute_type || 'B-Flute',
+      productionMethod: q.production_method || 'In-house',
+      cartonType: q.carton_type || 'RSC',
+      dieLength: q.die_length_mm ? String(q.die_length_mm) : '',
+      dieWidth: q.die_width_mm ? String(q.die_width_mm) : '',
+      quoteNo: q.quote_no || `QT-${String(q.id).padStart(5, '0')}`,
+      isEditing: forEdit,
+      isCustomerNameOnlyEdit: forEdit,
+      editQuoteId: q.id,
+      joiningType: q.joining_type || 'Glued',
+      isPrinted: q.is_printed || false,
+      printName: q.print_name || '',
+      whiteLinerRate: q.white_liner_rate ? String(q.white_liner_rate) : '',
+      brownLinerRate: q.brown_liner_rate ? String(q.brown_liner_rate) : '',
+      gsm1: gsmArray[0] !== undefined ? String(gsmArray[0]) : '',
+      gsm2: gsmArray[1] !== undefined ? String(gsmArray[1]) : '',
+      gsm3: gsmArray[2] !== undefined ? String(gsmArray[2]) : '',
+      gsm4: gsmArray[3] !== undefined ? String(gsmArray[3]) : '',
+      gsm5: gsmArray[4] !== undefined ? String(gsmArray[4]) : '',
+      gsm6: gsmArray[5] !== undefined ? String(gsmArray[5]) : '',
+      gsm7: gsmArray[6] !== undefined ? String(gsmArray[6]) : '',
+      totalOverheadForOrder: q.total_overhead_for_order !== undefined ? String(q.total_overhead_for_order) : '',
+      joiningCost: q.joining_cost !== undefined ? String(q.joining_cost) : '',
+      printCost: q.print_cost !== undefined ? String(q.print_cost) : '',
+      slottingCost: q.slotting_cost !== undefined ? String(q.slotting_cost) : '',
+      bundlingCost: q.bundling_cost !== undefined ? String(q.bundling_cost) : '',
+      diecuttingCost: q.diecutting_cost !== undefined ? String(q.diecutting_cost) : '',
+      profitMargin: q.profit_margin_percent !== undefined ? String(q.profit_margin_percent) : '15',
+      taxType: q.tax_type?.includes('VAT') && !q.tax_type?.includes('Non-VAT') ? 'VAT' : 'Non-VAT',
+      hasInhouseCommission: q.has_inhouse_commission || false,
+      hasThirdPartyCommission: q.has_third_party_commission || false,
+      thirdPartyCommission: q.third_party_commission !== undefined ? String(q.third_party_commission) : '',
+      hasTransport: q.has_transport || false,
+      transportCost: q.transport_cost !== undefined ? String(q.transport_cost) : '',
+      transportOption: q.transport_option || (q.has_transport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
+      oneTimeDieCost: q.die_making_cost ? String(q.die_making_cost) : '',
+      oneTimeBlockCost: q.block_making_cost ? String(q.block_making_cost) : '',
+      oneTimeTransportCost: q.one_time_transport_cost ? String(q.one_time_transport_cost) : '',
+      paymentMethod: q.payment_method || 'Credit - 30 Days',
+      dimensionUnit: q.dimension_unit || 'mm',
+    });
+
+    if (q.calculated_cost) {
+      setCalculatedCost(q.calculated_cost);
+    }
+  };
+
   const handleLoadForCustomerEdit = async (quote) => {
     if (!canDelete) {
       alert('Only Admin has authority to edit customer name on existing quotations.');
@@ -171,96 +230,41 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
       const response = await axios.get(`/api/quotes/${quote.id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
       });
-      const q = response.data;
-      const gsmArray = q.gsm_values || [];
-
-      setFormData({
-        customerName: q.customer_name || '',
-        cartonLength: q.dimensions?.length_mm || q.carton_length_mm || '',
-        cartonWidth: q.dimensions?.width_mm || q.carton_width_mm || '',
-        cartonHeight: q.dimensions?.height_mm || q.carton_height_mm || '',
-        quantity: q.quantity || '',
-        plyType: q.ply_type || '3-Ply',
-        boardType: (q.board_type && q.board_type.toLowerCase().includes('white')) ? 'White Liner' : 'Brown Liner',
-        fluteType: q.flute_type || 'B-Flute',
-        fluteType2: q.flute_type_2 || q.flute_type || 'B-Flute',
-        productionMethod: q.production_method || 'In-house',
-        cartonType: q.carton_type || 'RSC',
-        dieLength: q.die_length_mm ? String(q.die_length_mm) : '',
-        dieWidth: q.die_width_mm ? String(q.die_width_mm) : '',
-        quoteNo: q.quote_no || `QT-${String(q.id).padStart(5, '0')}`,
-        isEditing: true,
-        isCustomerNameOnlyEdit: true,
-        editQuoteId: q.id,
-        joiningType: q.joining_type || 'Glued',
-        isPrinted: q.is_printed || false,
-        printName: q.print_name || '',
-        whiteLinerRate: q.white_liner_rate ? String(q.white_liner_rate) : '',
-        brownLinerRate: q.brown_liner_rate ? String(q.brown_liner_rate) : '',
-        gsm1: gsmArray[0] !== undefined ? String(gsmArray[0]) : '',
-        gsm2: gsmArray[1] !== undefined ? String(gsmArray[1]) : '',
-        gsm3: gsmArray[2] !== undefined ? String(gsmArray[2]) : '',
-        gsm4: gsmArray[3] !== undefined ? String(gsmArray[3]) : '',
-        gsm5: gsmArray[4] !== undefined ? String(gsmArray[4]) : '',
-        gsm6: gsmArray[5] !== undefined ? String(gsmArray[5]) : '',
-        gsm7: gsmArray[6] !== undefined ? String(gsmArray[6]) : '',
-        totalOverheadForOrder: q.total_overhead_for_order !== undefined ? String(q.total_overhead_for_order) : '',
-        joiningCost: q.joining_cost !== undefined ? String(q.joining_cost) : '',
-        printCost: q.print_cost !== undefined ? String(q.print_cost) : '',
-        slottingCost: q.slotting_cost !== undefined ? String(q.slotting_cost) : '',
-        bundlingCost: q.bundling_cost !== undefined ? String(q.bundling_cost) : '',
-        diecuttingCost: q.diecutting_cost !== undefined ? String(q.diecutting_cost) : '',
-        profitMargin: q.profit_margin_percent !== undefined ? String(q.profit_margin_percent) : '15',
-        taxType: q.tax_type?.includes('VAT') && !q.tax_type?.includes('Non-VAT') ? 'VAT' : 'Non-VAT',
-        hasInhouseCommission: q.has_inhouse_commission || false,
-        hasThirdPartyCommission: q.has_third_party_commission || false,
-        thirdPartyCommission: q.third_party_commission !== undefined ? String(q.third_party_commission) : '',
-        hasTransport: q.has_transport || false,
-        transportCost: q.transport_cost !== undefined ? String(q.transport_cost) : '',
-        transportOption: q.transport_option || (q.has_transport ? 'Including transport' : 'Ex factory price from Biyagama factory ( No transport)'),
-        oneTimeDieCost: q.die_making_cost ? String(q.die_making_cost) : '',
-        oneTimeBlockCost: q.block_making_cost ? String(q.block_making_cost) : '',
-        oneTimeTransportCost: q.one_time_transport_cost ? String(q.one_time_transport_cost) : '',
-        paymentMethod: q.payment_method || 'Credit - 30 Days',
-        dimensionUnit: q.dimension_unit || 'mm',
-      });
-
-      if (q.final_cost_per_carton || q.calculated_cost) {
-        setCalculatedCost(q.calculated_cost || {
-          final: {
-            final_cost_per_carton: q.final_cost_per_carton,
-            total_cost_batch: q.total_cost_batch
-          },
-          sheet_dimensions: q.sheet_dimensions || {
-            sheet_length_mm: q.sheet_length_mm,
-            sheet_width_mm: q.sheet_width_mm,
-            board_area_m2: q.board_area_m2,
-            selected_reel_mm: q.selected_reel_mm,
-            sheets_per_reel: q.sheets_per_reel,
-            reel_waste_mm: q.reel_waste_mm
-          },
-          rates: {
-            rm_cost_per_carton: q.rm_cost_per_carton || 0
-          },
-          profit: {
-            profit_amount: q.profit_per_carton || 0
-          },
-          tax: {
-            tax_type: q.tax_type,
-            tax_amount_per_carton: q.tax_amount_per_carton || 0
-          },
-          material: {
-            total_gsm: 0,
-            weight_per_sheet_kg: 0
-          }
-        });
-      }
-
+      populateQuoteIntoState(response.data, true);
       setActiveTab('calculator');
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to load quote details');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleViewCalculationLogic = async (quoteOrId) => {
+    const quoteId = typeof quoteOrId === 'object' ? quoteOrId.id : quoteOrId;
+    if (!quoteId) return;
+    setActionLoading(true);
+    try {
+      const response = await axios.get(`/api/quotes/${quoteId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      populateQuoteIntoState(response.data, false);
+      setActiveTab('steps');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to load quotation calculation logic');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const preloadQuoteForCalculation = async (quoteId) => {
+    if (!quoteId || String(quoteId).startsWith('compiled-')) return;
+    try {
+      const response = await axios.get(`/api/quotes/${quoteId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      populateQuoteIntoState(response.data, false);
+    } catch (_) {
+      // background preload
     }
   };
 
@@ -659,6 +663,22 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <button
                     type="button"
+                    onClick={() => handleViewCalculationLogic(selectedQuoteIds[selectedQuoteIds.length - 1])}
+                    style={{
+                      backgroundColor: '#7c3aed',
+                      color: '#ffffff',
+                      border: '2px solid #5b21b6',
+                      fontWeight: '900',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.25)'
+                    }}
+                    className="px-4 py-2.5 rounded-xl text-xs sm:text-sm hover:opacity-90 hover:scale-[1.02] cursor-pointer transition flex items-center gap-1.5"
+                    title="View live step-by-step solver, sheet formulas, and full working sheet for this quotation"
+                  >
+                    <span>📐</span>
+                    <span>View Calculation Logic {selectedQuoteIds.length > 1 ? `(#${selectedQuoteIds[selectedQuoteIds.length - 1]})` : ''}</span>
+                  </button>
+                  <button
+                    type="button"
                     disabled={isInvalidForCompile}
                     onClick={handleCompileSelected}
                     style={{
@@ -809,6 +829,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                           e.stopPropagation();
                           if (e.target.checked) {
                             setSelectedQuoteIds(prev => [...prev, quote.id]);
+                            preloadQuoteForCalculation(quote.id);
                           } else {
                             setSelectedQuoteIds(prev => prev.filter(id => id !== quote.id));
                           }
@@ -976,6 +997,20 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
                       >
                         📄 View Quotation
                       </button>
+                      <button
+                        onClick={() => handleViewCalculationLogic(quote.id)}
+                        style={{
+                          backgroundColor: isDark ? '#4c1d95' : '#ede9fe',
+                          color: isDark ? '#ddd6fe' : '#6d28d9',
+                          border: '1.5px solid ' + (isDark ? '#8b5cf6' : '#7c3aed'),
+                          fontWeight: '800'
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg transition cursor-pointer text-xs shadow-2xs hover:scale-105 inline-flex items-center gap-1"
+                        title="Inspect step-by-step mathematical logic and working sheet for this quote"
+                      >
+                        <span>📐</span>
+                        <span>Logic</span>
+                      </button>
                       {canDelete && (
                         <button
                           onClick={() => handleLoadForCustomerEdit(quote)}
@@ -1103,6 +1138,7 @@ export default function QuoteHistory({ user, setFormData, setCalculatedCost, set
           user={user}
           onClose={() => setSelectedQuote(null)}
           onDelete={canDelete && selectedQuote.id && !String(selectedQuote.id).startsWith('compiled-') ? () => handleDeleteQuote(selectedQuote.id, selectedQuote.quote_no) : null}
+          onViewCalculationLogic={selectedQuote.id && !String(selectedQuote.id).startsWith('compiled-') ? () => handleViewCalculationLogic(selectedQuote.id) : null}
           theme={theme}
         />
       )}
