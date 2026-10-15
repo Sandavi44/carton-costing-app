@@ -1,8 +1,10 @@
 # 🏭 Corrugated Carton Costing System
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-carton--costing--app--1.onrender.com-brightgreen?style=for-the-badge&logo=render)](https://carton-costing-app-1.onrender.com/)
+
 An industrial-grade full-stack cost estimation and quotation web platform built for corrugated carton manufacturing — powered by **Flask (Python)**, **React 19 (Vite)**, **PostgreSQL**, and **Tailwind CSS v4**.
 
-🔗 **Live Deployment:** [carton-costing-app-1.onrender.com](https://carton-costing-app-1.onrender.com/)
+- 🌐 **Live Web Application:** [https://carton-costing-app-1.onrender.com/](https://carton-costing-app-1.onrender.com/)
 
 ---
 
